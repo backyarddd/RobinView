@@ -107,17 +107,22 @@ export async function searchSymbols(query: string): Promise<SearchResult[]> {
     if (!res.ok) return [];
     const json: any = await res.json();
     const quotes: any[] = json?.quotes ?? [];
+    const allowed = new Set(["EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY"]);
     return quotes
-      .filter((r) => r.symbol && (r.quoteType === "EQUITY" || r.quoteType === "ETF" || r.quoteType === "INDEX"))
+      .filter((r) => r.symbol && allowed.has(r.quoteType))
       .slice(0, 12)
       .map((r) => {
         const name = r.shortname || r.longname || r.symbol;
         cacheName(r.symbol, name);
-        return {
-          symbol: r.symbol,
-          name,
-          assetClass: (r.quoteType === "ETF" ? "etf" : r.quoteType === "INDEX" ? "index" : "equity") as AssetClass,
-        };
+        const assetClass: AssetClass =
+          r.quoteType === "ETF"
+            ? "etf"
+            : r.quoteType === "INDEX"
+              ? "index"
+              : r.quoteType === "CRYPTOCURRENCY"
+                ? "crypto"
+                : "equity";
+        return { symbol: r.symbol, name, assetClass };
       });
   } catch {
     return [];

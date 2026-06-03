@@ -80,7 +80,7 @@ export const useStore = create<StoreState>((set, get) => ({
   orders: [],
   quotes: {},
   prevPrice: {},
-  watchlist: load<string[]>(WATCHLIST_KEY, ["NVDA", "AAPL", "TSLA", "MSFT", "AMD", "SPY"]),
+  watchlist: load<string[]>(WATCHLIST_KEY, ["NVDA", "AAPL", "TSLA", "MSFT", "AMD", "SPY", "BTC-USD"]),
   alerts: load<Alert[]>(ALERTS_KEY, []),
   selected: "NVDA",
   equityTrail: [],
