@@ -23,6 +23,12 @@ export interface PriceHistoryPoint {
   v: number;
 }
 
+export interface WatchlistGroup {
+  id: string;
+  name: string;
+  symbols: string[];
+}
+
 interface StoreState {
   mode: "live" | "demo" | "connecting";
   connected: boolean;
@@ -35,7 +41,9 @@ interface StoreState {
   orders: OrderRow[];
   quotes: Record<string, Quote>;
   prevPrice: Record<string, number>;
-  watchlist: string[];
+  watchlist: string[]; // mirror of the active list's symbols (read-only convenience)
+  watchlists: WatchlistGroup[];
+  activeListId: string;
   alerts: Alert[];
   selected: string;
   // small in-memory equity-curve trail for the sparkline header
@@ -46,6 +54,10 @@ interface StoreState {
   select: (symbol: string) => void;
   addToWatchlist: (symbol: string) => void;
   removeFromWatchlist: (symbol: string) => void;
+  createWatchlist: (name: string) => void;
+  renameWatchlist: (id: string, name: string) => void;
+  deleteWatchlist: (id: string) => void;
+  setActiveWatchlist: (id: string) => void;
   addAlert: (a: Omit<Alert, "id" | "createdAt">) => void;
   removeAlert: (id: string) => void;
   connectRobinhood: () => Promise<void>;
@@ -54,7 +66,8 @@ interface StoreState {
   _ingest: (msg: WsMessage) => void;
 }
 
-const WATCHLIST_KEY = "robinview.watchlist";
+const WATCHLIST_KEY = "robinview.watchlist"; // legacy single list (migrated)
+const WATCHLISTS_KEY = "robinview.watchlists.v2";
 const ALERTS_KEY = "robinview.alerts";
 
 function load<T>(key: string, fallback: T): T {
@@ -65,6 +78,25 @@ function load<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
+
+function uid(): string {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+// Load watchlist groups, migrating a legacy single list if present.
+function loadWatchlists(): { lists: WatchlistGroup[]; activeId: string } {
+  const saved = load<{ lists: WatchlistGroup[]; activeId: string } | null>(WATCHLISTS_KEY, null);
+  if (saved && saved.lists?.length) return saved;
+  const legacy = load<string[]>(WATCHLIST_KEY, ["NVDA", "AAPL", "TSLA", "MSFT", "AMD", "SPY", "BTC-USD"]);
+  const lists: WatchlistGroup[] = [{ id: uid(), name: "My List", symbols: legacy }];
+  return { lists, activeId: lists[0].id };
+}
+
+function persistLists(lists: WatchlistGroup[], activeId: string) {
+  localStorage.setItem(WATCHLISTS_KEY, JSON.stringify({ lists, activeId }));
+}
+
+const _wl = loadWatchlists();
 
 let ws: WebSocket | null = null;
 
@@ -80,7 +112,9 @@ export const useStore = create<StoreState>((set, get) => ({
   orders: [],
   quotes: {},
   prevPrice: {},
-  watchlist: load<string[]>(WATCHLIST_KEY, ["NVDA", "AAPL", "TSLA", "MSFT", "AMD", "SPY", "BTC-USD"]),
+  watchlists: _wl.lists,
+  activeListId: _wl.activeId,
+  watchlist: _wl.lists.find((l) => l.id === _wl.activeId)?.symbols ?? _wl.lists[0]?.symbols ?? [],
   alerts: load<Alert[]>(ALERTS_KEY, []),
   selected: "NVDA",
   equityTrail: [],
@@ -204,16 +238,57 @@ export const useStore = create<StoreState>((set, get) => ({
 
   addToWatchlist: (symbol) => {
     const s = symbol.toUpperCase();
-    const watchlist = get().watchlist.includes(s) ? get().watchlist : [s, ...get().watchlist];
-    set({ watchlist });
-    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
+    const { watchlists, activeListId } = get();
+    const lists = watchlists.map((l) =>
+      l.id === activeListId && !l.symbols.includes(s) ? { ...l, symbols: [s, ...l.symbols] } : l,
+    );
+    const active = lists.find((l) => l.id === activeListId)!;
+    set({ watchlists: lists, watchlist: active.symbols });
+    persistLists(lists, activeListId);
     subscribeAll(get);
   },
 
   removeFromWatchlist: (symbol) => {
-    const watchlist = get().watchlist.filter((s) => s !== symbol.toUpperCase());
-    set({ watchlist });
-    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist));
+    const s = symbol.toUpperCase();
+    const { watchlists, activeListId } = get();
+    const lists = watchlists.map((l) =>
+      l.id === activeListId ? { ...l, symbols: l.symbols.filter((x) => x !== s) } : l,
+    );
+    const active = lists.find((l) => l.id === activeListId)!;
+    set({ watchlists: lists, watchlist: active.symbols });
+    persistLists(lists, activeListId);
+  },
+
+  createWatchlist: (name) => {
+    const list: WatchlistGroup = { id: uid(), name: name.trim() || "New List", symbols: [] };
+    const lists = [...get().watchlists, list];
+    set({ watchlists: lists, activeListId: list.id, watchlist: list.symbols });
+    persistLists(lists, list.id);
+    subscribeAll(get);
+  },
+
+  renameWatchlist: (id, name) => {
+    const lists = get().watchlists.map((l) => (l.id === id ? { ...l, name: name.trim() || l.name } : l));
+    set({ watchlists: lists });
+    persistLists(lists, get().activeListId);
+  },
+
+  deleteWatchlist: (id) => {
+    let lists = get().watchlists.filter((l) => l.id !== id);
+    if (lists.length === 0) lists = [{ id: uid(), name: "My List", symbols: [] }];
+    const activeListId = get().activeListId === id ? lists[0].id : get().activeListId;
+    const active = lists.find((l) => l.id === activeListId)!;
+    set({ watchlists: lists, activeListId, watchlist: active.symbols });
+    persistLists(lists, activeListId);
+    subscribeAll(get);
+  },
+
+  setActiveWatchlist: (id) => {
+    const active = get().watchlists.find((l) => l.id === id);
+    if (!active) return;
+    set({ activeListId: id, watchlist: active.symbols });
+    persistLists(get().watchlists, id);
+    subscribeAll(get);
   },
 
   addAlert: (a) => {

@@ -854,6 +854,75 @@
 }
 
 /* ====================  WATCHLIST  ==================== */
+.wl-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-1);
+}
+.wl-switch:hover .panel-title {
+  color: var(--up);
+}
+.wl-caret {
+  color: var(--text-3);
+  font-size: 10px;
+}
+.wl-menu {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  z-index: 20;
+  width: 230px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-pop);
+  padding: 5px;
+}
+.wl-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-2);
+}
+.wl-menu-item:hover {
+  background: var(--surface-3);
+  color: var(--text-1);
+}
+.wl-menu-item.on {
+  color: var(--up);
+}
+.wl-mini {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.wl-mini:hover {
+  color: var(--text-1);
+  background: var(--surface-hover);
+}
+.wl-menu-new {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 9px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.wl-menu-new:hover {
+  color: var(--up);
+}
 .wl-row {
   display: grid;
   grid-template-columns: 1fr auto;

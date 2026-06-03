@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useStore } from "../../store/useStore";
 import { useTrails } from "../../hooks/useTrails";
 import { Sparkline, ChangePill } from "../common/bits";
@@ -6,16 +7,76 @@ import { price as fmtPrice } from "../../lib/format";
 
 export function Watchlist({ onAdd }: { onAdd: () => void }) {
   const watchlist = useStore((s) => s.watchlist);
+  const watchlists = useStore((s) => s.watchlists);
+  const activeListId = useStore((s) => s.activeListId);
+  const setActiveWatchlist = useStore((s) => s.setActiveWatchlist);
+  const createWatchlist = useStore((s) => s.createWatchlist);
+  const renameWatchlist = useStore((s) => s.renameWatchlist);
+  const deleteWatchlist = useStore((s) => s.deleteWatchlist);
   const quotes = useStore((s) => s.quotes);
   const selected = useStore((s) => s.selected);
   const select = useStore((s) => s.select);
   const remove = useStore((s) => s.removeFromWatchlist);
   const trails = useTrails(watchlist);
+  const [menu, setMenu] = useState(false);
+
+  const active = watchlists.find((l) => l.id === activeListId);
 
   return (
     <div className="panel" style={{ flex: 1, minHeight: 0 }}>
       <div className="panel-head">
-        <span className="panel-title">Watchlist</span>
+        <div style={{ position: "relative" }}>
+          <button className="wl-switch" onClick={() => setMenu((m) => !m)} title="Switch watchlist">
+            <span className="panel-title">{active?.name ?? "Watchlist"}</span>
+            <span className="wl-caret">▾</span>
+          </button>
+          {menu && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 19 }} onClick={() => setMenu(false)} />
+              <div className="wl-menu">
+                {watchlists.map((l) => (
+                  <div
+                    key={l.id}
+                    className={`wl-menu-item ${l.id === activeListId ? "on" : ""}`}
+                    onClick={() => {
+                      setActiveWatchlist(l.id);
+                      setMenu(false);
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>{l.name}</span>
+                    <span className="mono dim" style={{ fontSize: 11 }}>{l.symbols.length}</span>
+                    <button
+                      className="wl-mini"
+                      title="Rename"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const n = prompt("Rename list", l.name);
+                        if (n) renameWatchlist(l.id, n);
+                      }}
+                    >
+                      ✎
+                    </button>
+                    {watchlists.length > 1 && (
+                      <button
+                        className="wl-mini"
+                        title="Delete list"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete "${l.name}"?`)) deleteWatchlist(l.id);
+                        }}
+                      >
+                        <IconTrash size={13} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div className="wl-menu-new" onClick={() => { const n = prompt("New watchlist name", "New List"); if (n !== null) { createWatchlist(n); setMenu(false); } }}>
+                  <IconPlus size={13} /> New watchlist
+                </div>
+              </div>
+            </>
+          )}
+        </div>
         <span className="mono dim" style={{ fontSize: 11 }}>
           {watchlist.length}
         </span>
