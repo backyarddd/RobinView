@@ -11,9 +11,10 @@ export const TOOL_META: Record<DrawTool, { name: string; desc: string }> = {
   fib: { name: "Fib retracement", desc: "Retracement levels between two points" },
   brush: { name: "Brush", desc: "Freehand drawing" },
   text: { name: "Text note", desc: "Place a label on the chart" },
+  measure: { name: "Measure", desc: "Drag to measure price %, $ and bars" },
 };
 
-const ORDER: DrawTool[] = ["cursor", "trend", "ray", "hline", "vline", "rect", "fib", "brush", "text"];
+const ORDER: DrawTool[] = ["cursor", "trend", "ray", "hline", "vline", "rect", "fib", "brush", "text", "measure"];
 
 const COLORS = ["#34e29b", "#ff6a57", "#e3b766", "#6fa8ff", "#c08bff", "#eef2ee"];
 
@@ -38,6 +39,7 @@ export function ToolIcon({ tool, size = 17 }: { tool: DrawTool; size?: number })
     case "fib": return <svg {...s}><path d="M3 5h18M3 10h18M3 14h18M3 19h18" strokeOpacity="0.9" /></svg>;
     case "brush": return <svg {...s}><path d="M4 19c3 0 3-4 6-4s3 4 6 4M4 13c2-5 6-9 16-9" /></svg>;
     case "text": return <svg {...s}><path d="M5 5h14M12 5v14M9 19h6" /></svg>;
+    case "measure": return <svg {...s}><path d="M3 8h18v8H3zM7 8v3M11 8v4M15 8v3M19 8v4" /></svg>;
   }
 }
 

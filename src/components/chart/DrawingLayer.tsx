@@ -4,13 +4,14 @@ import type { IChartApi, ISeriesApi } from "lightweight-charts";
 export type DrawTool =
   | "cursor"
   | "trend"
-  | "hline"
   | "ray"
+  | "hline"
   | "vline"
   | "rect"
   | "fib"
   | "brush"
-  | "text";
+  | "text"
+  | "measure";
 
 // A point anchored in chart space: logical index (x, survives pan/zoom and
 // extends into whitespace) + price (y).
@@ -56,7 +57,21 @@ export function DrawingLayer({
   const [, force] = useState(0);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [draft, setDraft] = useState<Drawing | null>(null);
+  const [edit, setEdit] = useState<Drawing | null>(null); // shape being dragged
+  const [measure, setMeasure] = useState<Drawing | null>(null); // transient ruler
   const drafting = useRef(false);
+
+  // clear the measurement when leaving the measure tool or pressing Escape
+  useEffect(() => {
+    if (tool !== "measure") setMeasure(null);
+  }, [tool]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMeasure(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // re-project on every pan / zoom / resize
   useEffect(() => {
@@ -137,12 +152,54 @@ export function DrawingLayer({
   const onPointerUp = () => {
     if (!drafting.current || !draft) return;
     drafting.current = false;
+    if (draft.tool === "measure") {
+      setMeasure(draft); // transient — not saved to the objects list
+      setDraft(null);
+      return; // keep the measure tool active for repeated measurements
+    }
     if (draft.pts.length >= 2 || draft.tool === "brush") commit(draft);
     setDraft(null);
     onCommit();
   };
 
   const commit = (d: Drawing) => onChange([...drawings, { ...d, createdAt: d.createdAt ?? Date.now() }]);
+
+  // ---- drag-to-edit an existing drawing (cursor mode) ----
+  const startEdit = (
+    e: React.PointerEvent,
+    d: Drawing,
+    kind: "point" | "body",
+    index = 0,
+  ) => {
+    if (tool !== "cursor") return;
+    e.stopPropagation();
+    setSelectedId(d.id);
+    const start = fromXY(e.clientX, e.clientY);
+    if (!start) return;
+    const orig = d.pts;
+    const move = (ev: PointerEvent) => {
+      const cur = fromXY(ev.clientX, ev.clientY);
+      if (!cur) return;
+      let pts: Pt[];
+      if (kind === "point") pts = orig.map((p, i) => (i === index ? cur : p));
+      else {
+        const dl = cur.l - start.l;
+        const dp = cur.p - start.p;
+        pts = orig.map((p) => ({ l: p.l + dl, p: p.p + dp }));
+      }
+      setEdit({ ...d, pts });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setEdit((cur) => {
+        if (cur) onChange(drawings.map((x) => (x.id === cur.id ? cur : x)));
+        return null;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   const W = size.w;
   const H = size.h;
@@ -154,7 +211,8 @@ export function DrawingLayer({
       stroke: d.color,
       strokeWidth: sw,
       fill: "none",
-      style: { cursor: tool === "cursor" ? "pointer" : "crosshair", pointerEvents: "stroke" as const },
+      style: { cursor: tool === "cursor" ? "move" : "crosshair", pointerEvents: "stroke" as const },
+      onPointerDown: (e: React.PointerEvent) => startEdit(e, d, "body"),
       onClick: (e: React.MouseEvent) => {
         if (tool === "cursor") {
           e.stopPropagation();
@@ -265,6 +323,66 @@ export function DrawingLayer({
     }
   };
 
+  // Draggable endpoint handles for the selected drawing (cursor mode only).
+  const renderHandles = (d: Drawing) => {
+    if (tool !== "cursor" || d.id !== selectedId || d.tool === "brush") return null;
+    let pts: { x: number | null; y: number | null; i: number }[] = [];
+    if (d.tool === "hline") pts = [{ x: W / 2, y: toY(d.pts[0].p), i: 0 }];
+    else if (d.tool === "vline") pts = [{ x: toX(d.pts[0].l), y: H / 2, i: 0 }];
+    else pts = d.pts.map((p, i) => ({ x: toX(p.l), y: toY(p.p), i }));
+    return pts.map((h) =>
+      h.x == null || h.y == null ? null : (
+        <circle
+          key={`${d.id}-h${h.i}`}
+          cx={h.x}
+          cy={h.y}
+          r={5}
+          fill="var(--bg-base)"
+          stroke={d.color}
+          strokeWidth={2}
+          style={{ pointerEvents: "all", cursor: "grab" }}
+          onPointerDown={(e) => startEdit(e, d, "point", h.i)}
+        />
+      ),
+    );
+  };
+
+  const renderMeasure = () => {
+    if (!measure) return null;
+    const a = measure.pts[0];
+    const b = measure.pts[1];
+    if (!a || !b) return null;
+    const ax = toX(a.l);
+    const ay = toY(a.p);
+    const bx = toX(b.l);
+    const by = toY(b.p);
+    if (ax == null || ay == null || bx == null || by == null) return null;
+    const up = b.p >= a.p;
+    const c = up ? "#34e29b" : "#ff6a57";
+    const dP = b.p - a.p;
+    const pct = a.p ? (dP / a.p) * 100 : 0;
+    const bars = Math.round(b.l - a.l);
+    const boxW = 132;
+    const boxH = 46;
+    const bxX = Math.min(Math.max(bx + 10, 0), W - boxW);
+    const bxY = Math.min(Math.max(by - boxH / 2, 0), H - boxH);
+    return (
+      <g style={{ pointerEvents: "none" }}>
+        <rect x={Math.min(ax, bx)} y={Math.min(ay, by)} width={Math.abs(bx - ax)} height={Math.abs(by - ay)} fill={c + "14"} stroke={c} strokeWidth={1} strokeDasharray="4 3" />
+        <line x1={ax} y1={ay} x2={bx} y2={by} stroke={c} strokeWidth={1.5} />
+        <rect x={bxX} y={bxY} width={boxW} height={boxH} rx={6} fill="#141916" stroke={c} strokeWidth={1} />
+        <text x={bxX + 9} y={bxY + 18} fill={c} fontSize={12.5} fontFamily="var(--font-mono)" fontWeight={600}>
+          {dP >= 0 ? "+" : ""}{dP.toFixed(2)} ({pct >= 0 ? "+" : ""}{pct.toFixed(2)}%)
+        </text>
+        <text x={bxX + 9} y={bxY + 35} fill="var(--text-3)" fontSize={11} fontFamily="var(--font-mono)">
+          {Math.abs(bars)} bars
+        </text>
+      </g>
+    );
+  };
+
+  const editId = edit?.id;
+
   return (
     <svg
       ref={svgRef}
@@ -277,8 +395,19 @@ export function DrawingLayer({
         if (tool === "cursor") setSelectedId(null);
       }}
     >
-      {drawings.filter((d) => !d.hidden).map((d) => renderDrawing(d))}
+      {drawings
+        .filter((d) => !d.hidden)
+        .map((d) => {
+          const dd = editId === d.id && edit ? edit : d;
+          return (
+            <g key={d.id}>
+              {renderDrawing(dd)}
+              {renderHandles(dd)}
+            </g>
+          );
+        })}
       {draft && renderDrawing(draft, true)}
+      {renderMeasure()}
     </svg>
   );
 }

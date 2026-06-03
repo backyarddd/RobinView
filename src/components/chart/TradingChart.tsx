@@ -518,6 +518,26 @@ export function TradingChart({ symbol }: { symbol: string }) {
     return () => clearInterval(id);
   }, [replay, replayPlaying]);
 
+  // drawing-tool hotkeys (ignored while typing or with modifiers)
+  useEffect(() => {
+    const map: Record<string, DrawTool> = {
+      t: "trend", r: "ray", h: "hline", v: "vline", b: "rect",
+      f: "fib", d: "brush", x: "text", m: "measure", escape: "cursor",
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement;
+      if (el?.matches?.("input,textarea,select")) return;
+      const t = map[e.key.toLowerCase()];
+      if (t) {
+        setDrawTool(t);
+        if (t === "cursor") setSelectedId(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const toggleReplay = () => {
     setReplay((on) => {
       const next = !on;
