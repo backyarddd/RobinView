@@ -24,6 +24,9 @@ export interface Drawing {
   pts: Pt[];
   color: string;
   text?: string;
+  name?: string; // custom label shown in the Objects panel
+  hidden?: boolean;
+  createdAt?: number;
 }
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
@@ -139,7 +142,7 @@ export function DrawingLayer({
     onCommit();
   };
 
-  const commit = (d: Drawing) => onChange([...drawings, d]);
+  const commit = (d: Drawing) => onChange([...drawings, { ...d, createdAt: d.createdAt ?? Date.now() }]);
 
   const W = size.w;
   const H = size.h;
@@ -274,7 +277,7 @@ export function DrawingLayer({
         if (tool === "cursor") setSelectedId(null);
       }}
     >
-      {drawings.map((d) => renderDrawing(d))}
+      {drawings.filter((d) => !d.hidden).map((d) => renderDrawing(d))}
       {draft && renderDrawing(draft, true)}
     </svg>
   );

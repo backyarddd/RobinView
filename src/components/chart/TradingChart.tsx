@@ -14,6 +14,8 @@ import { useStore } from "../../store/useStore";
 import { ChartToolbar, OSCILLATORS, type ChartType, type IndicatorKey } from "./ChartToolbar";
 import { DrawingLayer, type DrawTool, type Drawing } from "./DrawingLayer";
 import { DrawingToolbar } from "./DrawingToolbar";
+import { ObjectsPanel } from "./ObjectsPanel";
+import { IconLayers } from "../common/icons";
 import {
   sma,
   ema,
@@ -87,6 +89,7 @@ export function TradingChart({ symbol }: { symbol: string }) {
   const [drawColor, setDrawColor] = useState("#34e29b");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const [showObjects, setShowObjects] = useState(false);
   const [chartNonce, setChartNonce] = useState(0); // bumps when chart/series (re)created
 
   const liveQuote = useStore((s) => s.quotes[symbol]);
@@ -510,6 +513,25 @@ export function TradingChart({ symbol }: { symbol: string }) {
             setSelectedId(null);
           }}
         />
+
+        <button
+          className={`objects-toggle ${showObjects ? "on" : ""}`}
+          onClick={() => setShowObjects((v) => !v)}
+          title="Objects (drawings)"
+        >
+          <IconLayers size={15} />
+          Objects
+          {drawings.length > 0 && <span className="objects-count">{drawings.length}</span>}
+        </button>
+        {showObjects && (
+          <ObjectsPanel
+            drawings={drawings}
+            selectedId={selectedId}
+            setSelectedId={setSelectedId}
+            onChange={updateDrawings}
+            onClose={() => setShowObjects(false)}
+          />
+        )}
         <div className="chart-legend">
           <div className="row" style={{ fontWeight: 700, fontFamily: "var(--font-display)", fontSize: 14 }}>
             {symbol}
