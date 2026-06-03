@@ -131,12 +131,15 @@ RobinView is precise about what is real:
 |------|-----------|-----------|
 | Quotes, positions, portfolio, orders | Simulated (deterministic) | **Real**, from Robinhood MCP |
 | Live price motion | Simulated tick engine | **Real** quote polling |
-| Historical OHLC candles | Generated | **Reconstructed** — see below |
+| Historical OHLC candles | **Real** market data | **Real** market data |
 
-The Robinhood MCP surface does not expose historical OHLC, so chart history is reconstructed
-by a deterministic, per-symbol random walk **anchored to the real live price and previous
-close**. Intraday motion layered on top is the real quote stream. This is disclosed in the
-chart and here so nobody mistakes the reconstructed history for settled exchange data.
+The Robinhood MCP surface does not expose historical OHLC, so chart history is pulled from a
+**keyless market-data source** (Yahoo Finance v8 chart API) in `server/provider/history.ts`
+— real intraday, daily, and weekly bars, cached per timeframe. The live last price (real in
+live mode, simulated in demo) is layered onto the forming candle. If that source is
+unreachable (offline/CI), RobinView falls back to a deterministic per-symbol generator
+anchored to the live price, so charts always render. Swapping in a different data vendor is a
+one-file change.
 
 ## Tech
 

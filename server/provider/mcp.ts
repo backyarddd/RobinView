@@ -13,6 +13,7 @@ import type {
   AssetClass,
 } from "../../shared/types.js";
 import { genCandles, intervalFor } from "./market.js";
+import { fetchHistory } from "./history.js";
 import { nameFor } from "./universe.js";
 
 const DEFAULT_URL = "https://agent.robinhood.com/mcp/trading";
@@ -175,20 +176,20 @@ export class MCPProvider implements DataProvider {
     }));
   }
 
-  // The Robinhood MCP surface does not expose historical OHLC, so chart history is
-  // reconstructed deterministically and anchored to the live last price.
-  // Live intraday motion comes from the real quote stream layered on top.
+  // The Robinhood MCP surface does not expose historical OHLC, so chart history
+  // comes from a real keyless market-data source; live intraday motion from the
+  // Robinhood quote stream is layered on top. Deterministic generator is the
+  // offline fallback.
   async getCandles(symbol: string, timeframe: Timeframe): Promise<CandleSeries> {
-    const [q] = await this.getQuotes([symbol]);
+    const sym = symbol.toUpperCase();
+    const interval = intervalFor(timeframe);
+    const real = await fetchHistory(sym, timeframe);
+    if (real) return { symbol: sym, timeframe, interval, candles: real };
+    const [q] = await this.getQuotes([sym]);
     const price = q?.price ?? 100;
     const prev = q?.previousClose ?? price;
     const nowSec = Math.floor(Date.now() / 1000);
-    return {
-      symbol: symbol.toUpperCase(),
-      timeframe,
-      interval: intervalFor(timeframe),
-      candles: genCandles(symbol, price, prev, timeframe, nowSec),
-    };
+    return { symbol: sym, timeframe, interval, candles: genCandles(sym, price, prev, timeframe, nowSec) };
   }
 }
 

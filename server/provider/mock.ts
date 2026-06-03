@@ -12,6 +12,7 @@ import type {
 } from "../../shared/types.js";
 import { UNIVERSE, lookup, nameFor } from "./universe.js";
 import { genCandles, intervalFor, rng, hashSymbol } from "./market.js";
+import { fetchHistory } from "./history.js";
 
 interface LiveState {
   price: number;
@@ -194,10 +195,14 @@ export class MockProvider implements DataProvider {
   }
 
   async getCandles(symbol: string, timeframe: Timeframe): Promise<CandleSeries> {
-    const q = this.quoteFor(symbol);
+    const sym = symbol.toUpperCase();
+    const interval = intervalFor(timeframe);
+    // Prefer real historical OHLC; fall back to the deterministic generator offline.
+    const real = await fetchHistory(sym, timeframe);
+    if (real) return { symbol: sym, timeframe, interval, candles: real };
+    const q = this.quoteFor(sym);
     const nowSec = Math.floor(Date.now() / 1000);
-    const candles = genCandles(symbol, q.price, q.previousClose, timeframe, nowSec);
-    return { symbol: symbol.toUpperCase(), timeframe, interval: intervalFor(timeframe), candles };
+    return { symbol: sym, timeframe, interval, candles: genCandles(sym, q.price, q.previousClose, timeframe, nowSec) };
   }
 
   async getOrders(_account: string): Promise<OrderRow[]> {
