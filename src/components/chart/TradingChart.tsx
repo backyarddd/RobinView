@@ -93,6 +93,45 @@ interface Legend {
   up: boolean;
 }
 
+// lightweight-charts formats UTCTimestamps in UTC by default, so we mirror that
+// (timeZone: "UTC") and only flip the hour cycle. This keeps the displayed clock
+// values identical to before and just honors the user's 12h/24h preference.
+function lwcDate(t: unknown): Date {
+  if (typeof t === "number") return new Date(t * 1000);
+  const b = t as { year: number; month: number; day: number };
+  return new Date(Date.UTC(b.year, (b.month || 1) - 1, b.day || 1));
+}
+function makeLocalization(hour12: boolean) {
+  return {
+    timeFormatter: (t: unknown) =>
+      lwcDate(t).toLocaleString("en-US", {
+        timeZone: "UTC",
+        month: "short",
+        day: "numeric",
+        hour: hour12 ? "numeric" : "2-digit",
+        minute: "2-digit",
+        hour12,
+      }),
+  };
+}
+// tickMarkType: 0 Year · 1 Month · 2 DayOfMonth · 3 Time · 4 TimeWithSeconds.
+function makeTickFormatter(hour12: boolean) {
+  return (t: unknown, tickMarkType: number): string => {
+    const d = lwcDate(t);
+    if (tickMarkType === 0) return d.toLocaleDateString("en-US", { timeZone: "UTC", year: "numeric" });
+    if (tickMarkType === 1) return d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short" });
+    if (tickMarkType === 2) return d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+    const secs = tickMarkType === 4 ? { second: "2-digit" as const } : {};
+    return d.toLocaleTimeString("en-US", {
+      timeZone: "UTC",
+      hour: hour12 ? "numeric" : "2-digit",
+      minute: "2-digit",
+      ...secs,
+      hour12,
+    });
+  };
+}
+
 const PARAMS_KEY = "robinview.indicatorParams";
 
 // Load persisted indicator params, deep-merging onto defaults so a partial or
@@ -179,6 +218,12 @@ export function TradingChart({ symbol }: { symbol: string }) {
   const liveQuote = useStore((s) => s.quotes[symbol]);
   const position = useStore((s) => s.positions.find((p) => p.symbol === symbol));
   const orders = useStore((s) => s.orders);
+  // 12h/24h clock preference for the chart's time axis + crosshair label. Read
+  // through a ref so the create-once chart effect picks up the current value
+  // without re-running; a dedicated effect re-applies it when it changes.
+  const hour12 = useStore((s) => s.hour12);
+  const hour12Ref = useRef(hour12);
+  hour12Ref.current = hour12;
   // Active oscillators in OSCILLATORS order. May be empty. Each gets its own
   // stacked lower pane. A stable string form is used as an effect dependency so
   // the lifecycle effect only re-runs when the SET of panes changes.
@@ -231,7 +276,13 @@ export function TradingChart({ symbol }: { symbol: string }) {
         horzLine: { color: "rgba(255,255,255,0.18)", labelBackgroundColor: "#1a201c" },
       },
       rightPriceScale: { borderColor: THEME.border, scaleMargins: { top: 0.08, bottom: 0.26 } },
-      timeScale: { borderColor: THEME.border, timeVisible: true, secondsVisible: false },
+      timeScale: {
+        borderColor: THEME.border,
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: makeTickFormatter(hour12Ref.current),
+      },
+      localization: makeLocalization(hour12Ref.current),
       handleScroll: true,
       handleScale: true,
     });
@@ -518,7 +569,13 @@ export function TradingChart({ symbol }: { symbol: string }) {
         grid: { vertLines: { color: THEME.grid }, horzLines: { color: THEME.grid } },
         crosshair: { mode: CrosshairMode.Normal, vertLine: { color: "rgba(255,255,255,0.18)" }, horzLine: { visible: false, labelVisible: false } },
         rightPriceScale: { borderColor: THEME.border },
-        timeScale: { borderColor: THEME.border, timeVisible: true, secondsVisible: false },
+        timeScale: {
+          borderColor: THEME.border,
+          timeVisible: true,
+          secondsVisible: false,
+          tickMarkFormatter: makeTickFormatter(hour12Ref.current),
+        },
+        localization: makeLocalization(hour12Ref.current),
       });
       oscCharts.current.set(key, chart);
       // This pane -> main (and via main's own handler, onward to sibling panes).
@@ -866,6 +923,23 @@ export function TradingChart({ symbol }: { symbol: string }) {
     const mode = compareSymbols.length > 0 ? 2 : base;
     chartRef.current.priceScale("right").applyOptions({ mode });
   }, [scaleMode, chartNonce, compareSymbols.length]);
+
+  // Re-apply the time-axis formatters when the 12h/24h preference flips, on the
+  // main chart and every oscillator pane.
+  useEffect(() => {
+    const loc = makeLocalization(hour12);
+    const tick = makeTickFormatter(hour12);
+    const apply = (c: IChartApi | null | undefined) => {
+      if (!c) return;
+      try {
+        c.applyOptions({ localization: loc, timeScale: { tickMarkFormatter: tick } });
+      } catch {
+        /* chart disposed mid-flight */
+      }
+    };
+    apply(chartRef.current);
+    for (const oc of oscCharts.current.values()) apply(oc);
+  }, [hour12, chartNonce, oscKey]);
 
   // comparison overlays - normalized % lines on the same scale
   useEffect(() => {

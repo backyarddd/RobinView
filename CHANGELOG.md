@@ -4,6 +4,18 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.1]
+
+### Fixed
+
+- The chart time axis and crosshair label now honor the 12-hour / 24-hour clock preference
+  (for example `1:30 PM` versus `13:30`), on the price pane and every oscillator pane.
+
+### Changed
+
+- The News tab now shows a headline-count badge (for example `News 10`) so it is obvious the
+  panel is populated. Per-symbol news with article summaries lives in **Terminal > News**.
+
 ## [0.2.0]
 
 ### Added

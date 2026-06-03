@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "../../store/useStore";
+import { api } from "../../lib/api";
 import { TradingChart } from "../chart/TradingChart";
 import { Watchlist } from "../panels/Watchlist";
 import { SymbolQuote } from "../panels/SymbolQuote";
@@ -18,6 +19,21 @@ export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
   const alerts = useStore((s) => s.alerts);
   const rhConnected = useStore((s) => s.mode === "demo" || s.robinhood.connected);
   const [tab, setTab] = useState<Tab>("positions");
+  // Headline count for the current symbol, so the News tab advertises that it is
+  // populated (otherwise the tab is easy to miss).
+  const [newsCount, setNewsCount] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    setNewsCount(0);
+    api
+      .news(symbol)
+      .then((n) => alive && setNewsCount(n.length))
+      .catch(() => alive && setNewsCount(0));
+    return () => {
+      alive = false;
+    };
+  }, [symbol]);
 
   return (
     <div className="terminal">
@@ -44,7 +60,7 @@ export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
               Info
             </button>
             <button className={`tab ${tab === "news" ? "on" : ""}`} onClick={() => setTab("news")}>
-              News
+              News {newsCount > 0 && <span className="badge">{newsCount}</span>}
             </button>
           </div>
         </div>
