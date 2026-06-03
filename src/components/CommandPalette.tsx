@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SearchResult } from "@shared/types";
 import { api } from "../lib/api";
 import { useStore } from "../store/useStore";
-import { IconSearch, IconWallet, IconGrid, IconBell, IconTerminal, IconArrow } from "./common/icons";
+import { IconSearch, IconWallet, IconGrid, IconBell, IconTerminal, IconArrow, IconFunnel } from "./common/icons";
 import type { View } from "./AppShell";
 
 interface NavCmd {
@@ -14,6 +14,7 @@ const NAV: NavCmd[] = [
   { id: "terminal", label: "Open Terminal", icon: <IconTerminal size={16} /> },
   { id: "portfolio", label: "Open Portfolio", icon: <IconWallet size={16} /> },
   { id: "markets", label: "Open Markets", icon: <IconGrid size={16} /> },
+  { id: "screener", label: "Open Screener", icon: <IconFunnel size={16} /> },
   { id: "alerts", label: "Open Alerts", icon: <IconBell size={16} /> },
 ];
 

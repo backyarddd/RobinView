@@ -6,6 +6,9 @@ import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { WebSocketServer, WebSocket } from "ws";
 import { createProvider, MockProvider, LiveProvider } from "./provider/index.js";
+import { fetchFundamentals } from "./provider/fundamentals.js";
+import { fetchNews } from "./provider/news.js";
+import { fetchScreener } from "./provider/screener.js";
 import type { WsClientMessage, WsMessage } from "../shared/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -54,6 +57,15 @@ app.get("/api/candles/:symbol", (req, res) => {
   ok(res, () => provider.getCandles(req.params.symbol, tf));
 });
 app.get("/api/search", (req, res) => ok(res, () => provider.search(String(req.query.q || ""))));
+
+// ── Free keyless market data (Yahoo Finance) ───────────────────────────────
+app.get("/api/fundamentals/:symbol", (req, res) =>
+  ok(res, () => fetchFundamentals(req.params.symbol)),
+);
+app.get("/api/news/:symbol", (req, res) => ok(res, () => fetchNews(req.params.symbol)));
+app.get("/api/screener", (req, res) =>
+  ok(res, () => fetchScreener(String(req.query.preset || "day_gainers"))),
+);
 
 // ── Robinhood MCP connection (OAuth) ───────────────────────────────────────
 const rhUnavailable = { connected: false, connecting: false, hasSession: false, error: null, available: false };

@@ -32,6 +32,45 @@ export interface RhStatus {
   error?: string | null;
 }
 
+export interface Fundamentals {
+  symbol: string;
+  longName?: string;
+  sector?: string;
+  industry?: string;
+  description?: string;
+  marketCap?: number;
+  peRatio?: number;
+  forwardPe?: number;
+  eps?: number;
+  dividendYield?: number;
+  beta?: number;
+  week52High?: number;
+  week52Low?: number;
+  dayHigh?: number;
+  dayLow?: number;
+  avgVolume?: number;
+  sharesOutstanding?: number;
+  nextEarningsDate?: number;
+}
+
+export interface NewsItem {
+  title: string;
+  publisher?: string;
+  link: string;
+  publishedAt?: number;
+  thumbnail?: string;
+}
+
+export interface ScreenerRow {
+  symbol: string;
+  name: string;
+  price: number;
+  changePct: number;
+  marketCap?: number;
+  volume?: number;
+  peRatio?: number;
+}
+
 export const api = {
   health: () => get<{ mode: "live" | "demo"; ok: boolean; robinhood: boolean }>("/api/health"),
   robinhood: {
@@ -48,4 +87,7 @@ export const api = {
   candles: (symbol: string, tf: Timeframe) =>
     get<CandleSeries>(`/api/candles/${symbol}?tf=${tf}`),
   search: (q: string) => get<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
+  fundamentals: (symbol: string) => get<Fundamentals>(`/api/fundamentals/${symbol}`),
+  news: (symbol: string) => get<NewsItem[]>(`/api/news/${symbol}`),
+  screener: (preset = "day_gainers") => get<ScreenerRow[]>(`/api/screener?preset=${encodeURIComponent(preset)}`),
 };

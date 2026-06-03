@@ -6,9 +6,11 @@ import { SymbolQuote } from "../panels/SymbolQuote";
 import { PositionsTable } from "../panels/PositionsTable";
 import { OrdersTable } from "../panels/OrdersTable";
 import { AlertsPanel } from "../panels/AlertsPanel";
+import { SymbolInfo } from "../panels/SymbolInfo";
+import { NewsPanel } from "../panels/NewsPanel";
 import { ConnectCard } from "../ConnectRobinhood";
 
-type Tab = "positions" | "orders" | "alerts";
+type Tab = "positions" | "orders" | "alerts" | "info" | "news";
 
 export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
   const symbol = useStore((s) => s.selected);
@@ -38,6 +40,12 @@ export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
             <button className={`tab ${tab === "alerts" ? "on" : ""}`} onClick={() => setTab("alerts")}>
               Alerts <span className="badge">{alerts.filter((a) => !a.triggered).length}</span>
             </button>
+            <button className={`tab ${tab === "info" ? "on" : ""}`} onClick={() => setTab("info")}>
+              Info
+            </button>
+            <button className={`tab ${tab === "news" ? "on" : ""}`} onClick={() => setTab("news")}>
+              News
+            </button>
           </div>
         </div>
         <div className="panel-body">
@@ -48,6 +56,8 @@ export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
               {tab === "positions" && <PositionsTable />}
               {tab === "orders" && <OrdersTable />}
               {tab === "alerts" && <AlertsPanel />}
+              {tab === "info" && <SymbolInfo symbol={symbol} />}
+              {tab === "news" && <NewsPanel symbol={symbol} />}
             </>
           )}
         </div>

@@ -102,3 +102,13 @@ export const IconArea = ({ size }: P) => (
     <path d="M3 16l5-6 4 3 4-7 5 4v9H3z" />
   </svg>
 );
+export const IconFunnel = ({ size }: P) => (
+  <svg {...S(size)}>
+    <path d="M3 5h18l-7 8v6l-4 2v-8z" />
+  </svg>
+);
+export const IconNews = ({ size }: P) => (
+  <svg {...S(size)}>
+    <path d="M4 5h13v14H5a1 1 0 0 1-1-1zM17 8h3v9a2 2 0 0 1-2 2M7 9h7M7 13h7M7 17h4" />
+  </svg>
+);

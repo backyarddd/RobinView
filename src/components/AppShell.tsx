@@ -8,6 +8,7 @@ import {
   IconList,
   IconBell,
   IconGear,
+  IconFunnel,
 } from "./common/icons";
 import { TopBar } from "./TopBar";
 import { CommandPalette } from "./CommandPalette";
@@ -16,13 +17,15 @@ import { PortfolioView } from "./views/PortfolioView";
 import { MarketsView } from "./views/MarketsView";
 import { OrdersView } from "./views/OrdersView";
 import { AlertsView } from "./views/AlertsView";
+import { ScreenerView } from "./views/ScreenerView";
 
-export type View = "terminal" | "portfolio" | "markets" | "orders" | "alerts";
+export type View = "terminal" | "portfolio" | "markets" | "screener" | "orders" | "alerts";
 
 const NAV: { id: View; label: string; icon: (p: { size?: number }) => JSX.Element }[] = [
   { id: "terminal", label: "Terminal", icon: IconTerminal },
   { id: "portfolio", label: "Portfolio", icon: IconWallet },
   { id: "markets", label: "Markets", icon: IconGrid },
+  { id: "screener", label: "Screener", icon: IconFunnel },
   { id: "orders", label: "Orders", icon: IconList },
   { id: "alerts", label: "Alerts", icon: IconBell },
 ];
@@ -98,6 +101,7 @@ export function AppShell() {
         {view === "terminal" && <TerminalView onOpenSearch={() => setPalette(true)} />}
         {view === "portfolio" && <PortfolioView />}
         {view === "markets" && <MarketsView />}
+        {view === "screener" && <ScreenerView />}
         {view === "orders" && <OrdersView />}
         {view === "alerts" && <AlertsView />}
       </main>

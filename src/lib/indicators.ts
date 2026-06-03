@@ -288,3 +288,21 @@ export function toLine(candles: Candle[], series: number[]): LinePoint[] {
 }
 
 export const closes = (candles: Candle[]) => candles.map((c) => c.close);
+
+// Heikin Ashi candles — smoothed OHLC that filters noise / clarifies trend.
+export function heikinAshi(candles: Candle[]): Candle[] {
+  const out: Candle[] = [];
+  let prevO = 0;
+  let prevC = 0;
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i];
+    const close = (c.open + c.high + c.low + c.close) / 4;
+    const open = i === 0 ? (c.open + c.close) / 2 : (prevO + prevC) / 2;
+    const high = Math.max(c.high, open, close);
+    const low = Math.min(c.low, open, close);
+    out.push({ time: c.time, open, high, low, close, volume: c.volume });
+    prevO = open;
+    prevC = close;
+  }
+  return out;
+}

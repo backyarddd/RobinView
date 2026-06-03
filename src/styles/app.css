@@ -534,6 +534,37 @@
   box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 3px currentColor;
 }
 
+/* ----  Bar replay control bar  ---- */
+.replay-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 100px;
+  box-shadow: var(--shadow-pop);
+}
+.replay-bar .iconbtn {
+  font-size: 13px;
+}
+.replay-info {
+  font-size: 11.5px;
+  color: var(--text-2);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+.replay-range {
+  width: 160px;
+  accent-color: var(--up);
+  cursor: pointer;
+}
+
 /* ----  Objects (drawings) panel  ---- */
 .objects-toggle {
   position: absolute;

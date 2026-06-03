@@ -3,7 +3,8 @@ import type { Timeframe } from "@shared/types";
 import { IconCandle, IconLine, IconArea, IconLayers, IconStar } from "../common/icons";
 import { useStore } from "../../store/useStore";
 
-export type ChartType = "candles" | "area" | "line";
+export type ChartType = "candles" | "heikin" | "area" | "baseline" | "line";
+export type ScaleMode = "normal" | "log" | "percent";
 export type IndicatorKey =
   | "volume"
   | "sma20"
@@ -52,22 +53,35 @@ const OSC_DEFS: { key: IndicatorKey; label: string; hint: string }[] = [
   { key: "roc", label: "Rate of Change", hint: "12" },
 ];
 
+const SCALE_LABEL: Record<ScaleMode, string> = { normal: "Lin", log: "Log", percent: "%" };
+const SCALE_NEXT: Record<ScaleMode, ScaleMode> = { normal: "log", log: "percent", percent: "normal" };
+
 export function ChartToolbar({
   tf,
   setTf,
   type,
   setType,
+  scaleMode,
+  setScaleMode,
   indicators,
   toggle,
   symbol,
+  onExport,
+  replayActive,
+  onToggleReplay,
 }: {
   tf: Timeframe;
   setTf: (t: Timeframe) => void;
   type: ChartType;
   setType: (t: ChartType) => void;
+  scaleMode: ScaleMode;
+  setScaleMode: (m: ScaleMode) => void;
   indicators: Set<IndicatorKey>;
   toggle: (k: IndicatorKey) => void;
   symbol: string;
+  onExport: () => void;
+  replayActive: boolean;
+  onToggleReplay: () => void;
 }) {
   const [menu, setMenu] = useState(false);
   const watchlist = useStore((s) => s.watchlist);
@@ -89,13 +103,28 @@ export function ChartToolbar({
         <button className={type === "candles" ? "on" : ""} onClick={() => setType("candles")} title="Candlesticks">
           <IconCandle size={15} />
         </button>
+        <button className={type === "heikin" ? "on" : ""} onClick={() => setType("heikin")} title="Heikin Ashi">
+          <HeikinIcon />
+        </button>
         <button className={type === "area" ? "on" : ""} onClick={() => setType("area")} title="Area">
           <IconArea size={15} />
+        </button>
+        <button className={type === "baseline" ? "on" : ""} onClick={() => setType("baseline")} title="Baseline">
+          <BaselineIcon />
         </button>
         <button className={type === "line" ? "on" : ""} onClick={() => setType("line")} title="Line">
           <IconLine size={15} />
         </button>
       </div>
+
+      <button
+        className="btn sm"
+        onClick={() => setScaleMode(SCALE_NEXT[scaleMode])}
+        title="Price scale: Linear → Log → Percent"
+        style={{ fontFamily: "var(--font-mono)", minWidth: 44, justifyContent: "center" }}
+      >
+        {SCALE_LABEL[scaleMode]}
+      </button>
 
       <div style={{ position: "relative" }}>
         <button className="btn sm" onClick={() => setMenu((m) => !m)}>
@@ -146,6 +175,17 @@ export function ChartToolbar({
       <div className="spacer" style={{ flex: 1 }} />
 
       <button
+        className={`btn sm ${replayActive ? "" : "ghost"}`}
+        onClick={onToggleReplay}
+        title="Bar replay — step through history"
+        style={replayActive ? { color: "var(--up)", borderColor: "var(--up-dim)", background: "var(--up-wash)" } : undefined}
+      >
+        <ReplayIcon /> Replay
+      </button>
+      <button className="btn sm ghost" onClick={onExport} title="Export chart as PNG">
+        <ExportIcon />
+      </button>
+      <button
         className="btn sm ghost"
         onClick={() => (watched ? remove(symbol) : add(symbol))}
         title={watched ? "Remove from watchlist" : "Add to watchlist"}
@@ -156,3 +196,9 @@ export function ChartToolbar({
     </div>
   );
 }
+
+const ic = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+function HeikinIcon() { return <svg {...ic}><rect x="5" y="7" width="5" height="10" rx="1" /><rect x="14" y="9" width="5" height="7" rx="1" /><path d="M7.5 4v3M7.5 17v3M16.5 6v3M16.5 16v2" /></svg>; }
+function BaselineIcon() { return <svg {...ic}><path d="M3 12h18" strokeDasharray="2 2" strokeOpacity="0.6" /><path d="M3 14l4-5 4 2 4-6 5 4" /></svg>; }
+function ReplayIcon() { return <svg {...ic}><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4" /><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none" /></svg>; }
+function ExportIcon() { return <svg {...ic}><path d="M12 3v12M8 11l4 4 4-4M5 19h14" /></svg>; }

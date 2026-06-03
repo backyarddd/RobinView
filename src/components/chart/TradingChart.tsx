@@ -11,7 +11,7 @@ import {
 import type { Candle, Timeframe } from "@shared/types";
 import { api } from "../../lib/api";
 import { useStore } from "../../store/useStore";
-import { ChartToolbar, OSCILLATORS, type ChartType, type IndicatorKey } from "./ChartToolbar";
+import { ChartToolbar, OSCILLATORS, type ChartType, type IndicatorKey, type ScaleMode } from "./ChartToolbar";
 import { DrawingLayer, type DrawTool, type Drawing } from "./DrawingLayer";
 import { DrawingToolbar } from "./DrawingToolbar";
 import { ObjectsPanel } from "./ObjectsPanel";
@@ -29,10 +29,11 @@ import {
   williamsR,
   roc,
   psar,
+  heikinAshi,
   toLine,
   closes,
 } from "../../lib/indicators";
-import { money, price as fmtPrice, compactNum } from "../../lib/format";
+import { price as fmtPrice, compactNum, fmtDate } from "../../lib/format";
 
 const THEME = {
   text: "#9aa39c",
@@ -82,9 +83,13 @@ export function TradingChart({ symbol }: { symbol: string }) {
 
   const [tf, setTf] = useState<Timeframe>("1D");
   const [type, setType] = useState<ChartType>("candles");
+  const [scaleMode, setScaleMode] = useState<ScaleMode>("normal");
   const [indicators, setIndicators] = useState<Set<IndicatorKey>>(new Set(["sma20", "volume"]));
   const [legend, setLegend] = useState<Legend | null>(null);
   const [loading, setLoading] = useState(true);
+  const [replay, setReplay] = useState(false);
+  const [replayIdx, setReplayIdx] = useState(0);
+  const [replayPlaying, setReplayPlaying] = useState(false);
   const [drawTool, setDrawTool] = useState<DrawTool>("cursor");
   const [drawColor, setDrawColor] = useState("#34e29b");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -159,7 +164,7 @@ export function TradingChart({ symbol }: { symbol: string }) {
       chart.removeSeries(mainSeriesRef.current);
       mainSeriesRef.current = null;
     }
-    if (type === "candles") {
+    if (type === "candles" || type === "heikin") {
       mainSeriesRef.current = chart.addCandlestickSeries({
         upColor: THEME.up,
         downColor: THEME.down,
@@ -173,6 +178,17 @@ export function TradingChart({ symbol }: { symbol: string }) {
         lineColor: THEME.up,
         topColor: "rgba(52,226,155,0.28)",
         bottomColor: "rgba(52,226,155,0.0)",
+        lineWidth: 2,
+        priceLineColor: "rgba(255,255,255,0.25)",
+      });
+    } else if (type === "baseline") {
+      mainSeriesRef.current = chart.addBaselineSeries({
+        topLineColor: THEME.up,
+        topFillColor1: "rgba(52,226,155,0.28)",
+        topFillColor2: "rgba(52,226,155,0.02)",
+        bottomLineColor: THEME.down,
+        bottomFillColor1: "rgba(255,106,87,0.04)",
+        bottomFillColor2: "rgba(255,106,87,0.28)",
         lineWidth: 2,
         priceLineColor: "rgba(255,255,255,0.25)",
       });
@@ -222,13 +238,24 @@ export function TradingChart({ symbol }: { symbol: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [indicators]);
 
-  function setMainData() {
-    const cs = candlesRef.current;
+  // candles currently shown — full history, or truncated during bar replay.
+  const visible = (): Candle[] => {
+    const all = candlesRef.current;
+    if (!replay) return all;
+    return all.slice(0, Math.max(2, Math.min(all.length, replayIdx + 1)));
+  };
+
+  function setMainData(cs: Candle[]) {
     const s = mainSeriesRef.current;
     if (!s) return;
     if (type === "candles") {
       s.setData(cs.map((c) => ({ time: c.time as Time, open: c.open, high: c.high, low: c.low, close: c.close })));
+    } else if (type === "heikin") {
+      s.setData(heikinAshi(cs).map((c) => ({ time: c.time as Time, open: c.open, high: c.high, low: c.low, close: c.close })));
     } else {
+      if (type === "baseline" && cs.length) {
+        s.applyOptions({ baseValue: { type: "price", price: cs[0].close } });
+      }
       s.setData(cs.map((c) => ({ time: c.time as Time, value: c.close })));
     }
   }
@@ -236,8 +263,8 @@ export function TradingChart({ symbol }: { symbol: string }) {
   function applyData() {
     const chart = chartRef.current;
     if (!chart) return;
-    const cs = candlesRef.current;
-    setMainData();
+    const cs = visible();
+    setMainData(cs);
 
     // volume
     if (volSeriesRef.current) {
@@ -352,7 +379,7 @@ export function TradingChart({ symbol }: { symbol: string }) {
 
   function drawOsc() {
     const chart = oscChartRef.current;
-    const cs = candlesRef.current;
+    const cs = visible();
     if (!chart || !cs.length) return;
     oscRefs.current.forEach((s) => chart.removeSeries(s));
     oscRefs.current = [];
@@ -415,8 +442,9 @@ export function TradingChart({ symbol }: { symbol: string }) {
     chart.timeScale().fitContent();
   }
 
-  // ---- live price -> update last candle ----
+  // ---- live price -> update last candle (paused during replay) ----
   useEffect(() => {
+    if (replay) return;
     if (!liveQuote || !mainSeriesRef.current || !candlesRef.current.length) return;
     const cs = candlesRef.current;
     const last = cs[cs.length - 1];
@@ -424,12 +452,15 @@ export function TradingChart({ symbol }: { symbol: string }) {
     last.high = Math.max(last.high, liveQuote.price);
     last.low = Math.min(last.low, liveQuote.price);
     const s = mainSeriesRef.current;
-    if (type === "candles") {
+    if (type === "heikin") {
+      setMainData(cs); // HA last bar depends on the chain — recompute
+    } else if (type === "candles") {
       s.update({ time: last.time as Time, open: last.open, high: last.high, low: last.low, close: last.close });
     } else {
       s.update({ time: last.time as Time, value: last.close });
     }
-  }, [liveQuote, type]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveQuote, type, replay]);
 
   // load/persist drawings per symbol
   useEffect(() => {
@@ -456,6 +487,56 @@ export function TradingChart({ symbol }: { symbol: string }) {
     chartRef.current.applyOptions({ handleScroll: !drawing, handleScale: !drawing });
   }, [drawTool, chartNonce]);
 
+  // price scale mode: 0 normal · 1 logarithmic · 2 percentage
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const mode = scaleMode === "log" ? 1 : scaleMode === "percent" ? 2 : 0;
+    chartRef.current.priceScale("right").applyOptions({ mode });
+  }, [scaleMode, chartNonce]);
+
+  // bar replay: re-render the visible slice when the index / toggle changes
+  useEffect(() => {
+    if (candlesRef.current.length) {
+      applyData();
+      if (osc && oscChartRef.current) drawOsc();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replay, replayIdx]);
+
+  // replay autoplay
+  useEffect(() => {
+    if (!replay || !replayPlaying) return;
+    const id = setInterval(() => {
+      setReplayIdx((i) => {
+        if (i >= candlesRef.current.length - 1) {
+          setReplayPlaying(false);
+          return i;
+        }
+        return i + 1;
+      });
+    }, 350);
+    return () => clearInterval(id);
+  }, [replay, replayPlaying]);
+
+  const toggleReplay = () => {
+    setReplay((on) => {
+      const next = !on;
+      if (next) setReplayIdx(Math.max(2, Math.floor(candlesRef.current.length * 0.6)));
+      else setReplayPlaying(false);
+      return next;
+    });
+  };
+
+  const exportPng = () => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const url = chart.takeScreenshot().toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `RobinView-${symbol}-${tf}.png`;
+    a.click();
+  };
+
   const toggle = (k: IndicatorKey) => {
     setIndicators((prev) => {
       const next = new Set(prev);
@@ -476,9 +557,14 @@ export function TradingChart({ symbol }: { symbol: string }) {
         setTf={setTf}
         type={type}
         setType={setType}
+        scaleMode={scaleMode}
+        setScaleMode={setScaleMode}
         indicators={indicators}
         toggle={toggle}
         symbol={symbol}
+        onExport={exportPng}
+        replayActive={replay}
+        onToggleReplay={toggleReplay}
       />
       <div className="chart-wrap">
         <div ref={hostRef} className="chart-host" style={{ bottom: osc ? "30%" : 0 }} />
@@ -532,6 +618,42 @@ export function TradingChart({ symbol }: { symbol: string }) {
             onClose={() => setShowObjects(false)}
           />
         )}
+
+        {replay && (
+          <div className="replay-bar">
+            <button className="iconbtn" title="Step back" onClick={() => setReplayIdx((i) => Math.max(2, i - 1))}>⏮</button>
+            <button
+              className="iconbtn"
+              title={replayPlaying ? "Pause" : "Play"}
+              onClick={() => setReplayPlaying((p) => !p)}
+              style={{ color: "var(--up)" }}
+            >
+              {replayPlaying ? "⏸" : "▶"}
+            </button>
+            <button
+              className="iconbtn"
+              title="Step forward"
+              onClick={() => setReplayIdx((i) => Math.min(candlesRef.current.length - 1, i + 1))}
+            >
+              ⏭
+            </button>
+            <span className="replay-info mono">
+              {candlesRef.current[Math.min(replayIdx, candlesRef.current.length - 1)]
+                ? fmtDate(candlesRef.current[Math.min(replayIdx, candlesRef.current.length - 1)].time * 1000)
+                : ""}
+              <span className="dim"> · bar {Math.min(replayIdx + 1, candlesRef.current.length)}/{candlesRef.current.length}</span>
+            </span>
+            <input
+              className="replay-range"
+              type="range"
+              min={2}
+              max={Math.max(2, candlesRef.current.length - 1)}
+              value={Math.min(replayIdx, candlesRef.current.length - 1)}
+              onChange={(e) => setReplayIdx(Number(e.target.value))}
+            />
+          </div>
+        )}
+
         <div className="chart-legend">
           <div className="row" style={{ fontWeight: 700, fontFamily: "var(--font-display)", fontSize: 14 }}>
             {symbol}
