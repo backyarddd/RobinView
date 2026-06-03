@@ -6,6 +6,7 @@ import { SymbolQuote } from "../panels/SymbolQuote";
 import { PositionsTable } from "../panels/PositionsTable";
 import { OrdersTable } from "../panels/OrdersTable";
 import { AlertsPanel } from "../panels/AlertsPanel";
+import { ConnectCard } from "../ConnectRobinhood";
 
 type Tab = "positions" | "orders" | "alerts";
 
@@ -13,6 +14,7 @@ export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
   const symbol = useStore((s) => s.selected);
   const positions = useStore((s) => s.positions);
   const alerts = useStore((s) => s.alerts);
+  const rhConnected = useStore((s) => s.mode === "demo" || s.robinhood.connected);
   const [tab, setTab] = useState<Tab>("positions");
 
   return (
@@ -39,9 +41,15 @@ export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
           </div>
         </div>
         <div className="panel-body">
-          {tab === "positions" && <PositionsTable />}
-          {tab === "orders" && <OrdersTable />}
-          {tab === "alerts" && <AlertsPanel />}
+          {(tab === "positions" || tab === "orders") && !rhConnected ? (
+            <ConnectCard context={tab} />
+          ) : (
+            <>
+              {tab === "positions" && <PositionsTable />}
+              {tab === "orders" && <OrdersTable />}
+              {tab === "alerts" && <AlertsPanel />}
+            </>
+          )}
         </div>
       </div>
     </div>

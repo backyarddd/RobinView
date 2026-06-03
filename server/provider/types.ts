@@ -15,7 +15,7 @@ import type {
 export interface DataProvider {
   readonly mode: "live" | "demo";
   getAccounts(): Promise<Account[]>;
-  getPortfolio(account: string): Promise<Portfolio>;
+  getPortfolio(account: string): Promise<Portfolio | null>;
   getPositions(account: string): Promise<Position[]>;
   getQuotes(symbols: string[]): Promise<Quote[]>;
   getCandles(symbol: string, timeframe: Timeframe): Promise<CandleSeries>;

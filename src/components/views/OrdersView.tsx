@@ -1,6 +1,10 @@
 import { OrdersTable } from "../panels/OrdersTable";
+import { ConnectCard } from "../ConnectRobinhood";
+import { useStore } from "../../store/useStore";
 
 export function OrdersView() {
+  const rhConnected = useStore((s) => s.mode === "demo" || s.robinhood.connected);
+  if (!rhConnected) return <ConnectCard context="order history" />;
   return (
     <div className="pf">
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>

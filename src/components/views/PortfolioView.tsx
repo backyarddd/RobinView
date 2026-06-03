@@ -1,19 +1,23 @@
 import { useStore } from "../../store/useStore";
 import { PositionsTable } from "../panels/PositionsTable";
 import { AllocationDonut } from "../panels/AllocationDonut";
+import { ConnectCard } from "../ConnectRobinhood";
 import { Sparkline, ChangePill } from "../common/bits";
 import { money, signedMoney, percent, dirClass, compactMoney } from "../../lib/format";
 
 export function PortfolioView() {
   const pf = useStore((s) => s.portfolio);
+  const ready = useStore((s) => s.mode === "demo" || s.robinhood.connected);
   const trail = useStore((s) => s.equityTrail);
   const positions = useStore((s) => s.positions);
+
+  if (!ready) return <ConnectCard context="portfolio" />;
 
   if (!pf)
     return (
       <div className="empty" style={{ height: "100%" }}>
         <div className="loader" />
-        <span>Loading portfolio…</span>
+        <span>Loading your Robinhood portfolio…</span>
       </div>
     );
 

@@ -18,19 +18,22 @@ Live charts · technical indicators · real-time P&L · watchlists · price aler
 
 ## What is RobinView?
 
-**RobinView** turns your Robinhood account into a professional trading terminal. It reads
-live positions, quotes, and portfolio value through the official **Robinhood MCP trading
-server** and renders them in a fast, keyboard-driven interface modeled on the tools serious
-traders actually use — candlestick charts with studies, a live heatmap, sortable holdings,
-and crossing alerts.
+**RobinView is a TradingView-class terminal — with Robinhood added on.**
 
-It runs **out of the box in demo mode** (a deterministic market simulator — no account, no
-auth, instantly live) and switches to your real account by adding one token.
+The base is a fast, keyboard-driven market terminal on **real live data**: candlestick charts
+with studies, a live heatmap, watchlists, symbol search and price alerts. It works for anyone,
+with no account and no login.
+
+**Connect Robinhood** and RobinView overlays your real account — positions, balances, P&L and
+order history — by authorizing **directly with Robinhood** over the official MCP trading
+server. RobinView runs the OAuth flow itself and registers as its own client; it never reuses
+another app's credentials or copies data out of anything else.
 
 > [!IMPORTANT]
 > RobinView is an independent project and is **not affiliated with or endorsed by
-> Robinhood**. It is a portfolio **viewer and analysis tool** — not investment advice.
-> See [Data & honesty](#data--honesty) for exactly what is real vs. reconstructed.
+> Robinhood**. Connecting grants read access to your accounts (and trading only in a dedicated
+> Robinhood **Agentic** account). It is a viewer/analysis tool — not investment advice.
+> See [Data & honesty](#data--honesty) for exactly what is real.
 
 ## Features
 
@@ -70,24 +73,26 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5273**. That's it — demo mode streams a live simulated market
-immediately, so you can explore every feature with no account.
+Open **http://localhost:5273**. The terminal comes up on **real live market data** — charts,
+watchlists, search and the heatmap all work immediately, no login.
 
-## Going live with your Robinhood account
+## Connecting your Robinhood account
 
-RobinView talks to the Robinhood **MCP trading server** at `https://agent.robinhood.com/mcp/trading`.
-The endpoint is OAuth-gated, so you supply a bearer token from your Robinhood agent session:
+Click **Connect Robinhood** (top-right). RobinView:
 
-```bash
-cp .env.example .env
-# edit .env:
-#   ROBINVIEW_MODE=live
-#   ROBINHOOD_MCP_TOKEN=<your robinhood agent token>
-npm run dev
-```
+1. Performs OAuth discovery against `agent.robinhood.com` and **dynamically registers itself**
+   as its own OAuth client (PKCE, no secrets to manage).
+2. Opens Robinhood's authorization page — you log in and approve, opening a Robinhood
+   **Agentic** account if you don't have one.
+3. Robinhood redirects back to RobinView's local callback, which completes the token exchange
+   and connects. The session is stored under `~/.robinview` and resumes on restart.
 
-The top-bar badge flips from **Demo** to **Live** and your real accounts, positions, and
-portfolio value load. No token? RobinView stays in demo mode — it never blocks on auth.
+Your real accounts, positions, live P&L and order history then populate. Disconnect anytime
+from the **Robinhood** badge in the top bar. No data is ever copied from any other application —
+RobinView holds its own authorization.
+
+> Prefer to demo without an account? `ROBINVIEW_MODE=demo npm run dev` runs a deterministic
+> simulator (handy for screenshots/CI).
 
 ## Production
 
@@ -99,47 +104,52 @@ npm start          # single Node process serves API + WebSocket + static app on 
 ## Architecture
 
 ```
-                ┌──────────────────────── browser ────────────────────────┐
-                │  React + lightweight-charts · Zustand store · WS client  │
-                └───────────────┬───────────────────────┬──────────────────┘
-                       REST /api │                       │ /ws  (live quotes,
-                                 ▼                       ▼       portfolio, positions)
-                ┌──────────────────────── server (Node) ───────────────────┐
-                │  Express + ws  ·  tick loop broadcasts to subscribers     │
-                │                    DataProvider (one interface)           │
-                │        ┌────────────────────┴────────────────────┐        │
-                │   MockProvider (GBM sim)              MCPProvider (live)   │
-                └────────────────────────────────────────┬─────────────────┘
-                                                          ▼
-                                          Robinhood MCP trading server
+              ┌──────────────────────── browser ────────────────────────┐
+              │  React + lightweight-charts · Zustand · WS client        │
+              │  Connect-Robinhood OAuth popup ──┐                       │
+              └─────────┬────────────────────────┼───────────┬──────────┘
+                REST/api │                 OAuth  │      /ws  │ live quotes +
+                         ▼                 redirect▼           ▼ revalued portfolio
+              ┌──────────────────────── server (Node) ──────────────────┐
+              │  Express + ws · 1 Hz tick loop · DataProvider interface  │
+              │                                                          │
+              │   LiveProvider ─────────────┬──────────────────────────┐│
+              │     market data ▶ Yahoo (quotes, candles, search)       ││
+              │     account data ▶ RobinhoodConnection (own MCP OAuth)  ││
+              │                      · FileOAuthProvider (PKCE, tokens) ││
+              │   MockProvider ▶ deterministic simulator (ROBINVIEW_MODE=demo)
+              └───────────────────────────────────┬─────────────────────┘
+                          real market data         ▼  OAuth + MCP
+                       (Yahoo Finance)   Robinhood MCP  (agent.robinhood.com)
 ```
 
-A single `DataProvider` interface (`server/provider/types.ts`) backs both modes, so the UI
-is identical whether data is simulated or real. The server fans live updates out over one
-WebSocket, fetching each upstream symbol only once per tick regardless of how many panels
-subscribe.
+**Live valuation.** Your holdings (symbol, quantity, cost basis) come from Robinhood and
+change only when you trade — but RobinView revalues them against the live market quote stream
+every tick, so market value, day change, P&L and the portfolio total move in real time.
 
-- **`shared/types.ts`** — normalized domain model (the wire format sends decimals as strings; everything downstream is numbers)
+- **`server/provider/live.ts`** — composes market data + account data into one `DataProvider`
+- **`server/provider/robinhood.ts`** + **`oauth.ts`** — RobinView's own MCP OAuth connection
+- **`server/provider/quotes.ts`** / **`history.ts`** — real keyless market quotes & candles
 - **`src/lib/indicators.ts`** — pure, tested SMA/EMA/RSI/MACD/Bollinger/VWAP math
-- **`server/provider/`** — providers, the deterministic market engine, and the demo universe
+- **`shared/types.ts`** — normalized domain model (wire decimals → numbers once, at the seam)
 
 ## Data & honesty
 
 RobinView is precise about what is real:
 
-| Data | Demo mode | Live mode |
-|------|-----------|-----------|
-| Quotes, positions, portfolio, orders | Simulated (deterministic) | **Real**, from Robinhood MCP |
-| Live price motion | Simulated tick engine | **Real** quote polling |
-| Historical OHLC candles | **Real** market data | **Real** market data |
+| Data | Live mode (default) | Demo mode |
+|------|---------------------|-----------|
+| Quotes & live price motion | **Real** market quotes | Simulated tick engine |
+| Historical OHLC candles | **Real** intraday/daily/weekly | Real (same source) |
+| Symbol search | **Real** | Real (same source) |
+| Accounts, positions, portfolio, orders | **Real**, your Robinhood (once connected) | Simulated |
+| Portfolio valuation / P&L | **Real holdings × real live quotes** | Simulated |
 
-The Robinhood MCP surface does not expose historical OHLC, so chart history is pulled from a
-**keyless market-data source** (Yahoo Finance v8 chart API) in `server/provider/history.ts`
-— real intraday, daily, and weekly bars, cached per timeframe. The live last price (real in
-live mode, simulated in demo) is layered onto the forming candle. If that source is
-unreachable (offline/CI), RobinView falls back to a deterministic per-symbol generator
-anchored to the live price, so charts always render. Swapping in a different data vendor is a
-one-file change.
+Market data (quotes, candles, search) comes from a **keyless source** (Yahoo Finance), cached
+per request; offline, charts fall back to a deterministic per-symbol generator anchored to the
+last price so they always render. Account data comes from **your own Robinhood MCP
+authorization** — RobinView never copies it from another app. Swapping the market-data vendor
+(Polygon, Finnhub, …) is a one-file change in `server/provider/quotes.ts` + `history.ts`.
 
 ## Tech
 

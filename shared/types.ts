@@ -115,12 +115,19 @@ export interface MarketMover {
   change: number;
 }
 
+export interface RobinhoodStatus {
+  connected: boolean;
+  hasSession: boolean;
+  available: boolean;
+}
+
 // WebSocket envelope: server -> client.
 export type WsMessage =
   | { type: "hello"; mode: "live" | "demo"; account: string; time: number }
   | { type: "quotes"; quotes: Quote[] }
   | { type: "portfolio"; portfolio: Portfolio }
   | { type: "positions"; positions: Position[] }
+  | { type: "rhstatus"; connected: boolean; hasSession: boolean; available: boolean }
   | { type: "error"; message: string };
 
 // WebSocket client -> server.
