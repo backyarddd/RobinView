@@ -127,6 +127,157 @@ export function vwap(candles: Candle[]): number[] {
   return out;
 }
 
+// ── Oscillators & studies that need full OHLC ──
+
+export interface StochResult {
+  k: number[];
+  d: number[];
+}
+// Stochastic oscillator (%K smoothed, %D = SMA of %K).
+export function stochastic(candles: Candle[], kPeriod = 14, dPeriod = 3, smooth = 3): StochResult {
+  const n = candles.length;
+  const rawK = new Array(n).fill(NA);
+  for (let i = kPeriod - 1; i < n; i++) {
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - kPeriod + 1; j <= i; j++) {
+      hi = Math.max(hi, candles[j].high);
+      lo = Math.min(lo, candles[j].low);
+    }
+    const denom = hi - lo || 1e-9;
+    rawK[i] = ((candles[i].close - lo) / denom) * 100;
+  }
+  const k = smaIgnoreNaN(rawK, smooth);
+  const d = smaIgnoreNaN(k, dPeriod);
+  return { k, d };
+}
+
+// Average True Range.
+export function atr(candles: Candle[], period = 14): number[] {
+  const n = candles.length;
+  const tr = new Array(n).fill(NA);
+  for (let i = 0; i < n; i++) {
+    if (i === 0) tr[i] = candles[i].high - candles[i].low;
+    else {
+      const c = candles[i];
+      const pc = candles[i - 1].close;
+      tr[i] = Math.max(c.high - c.low, Math.abs(c.high - pc), Math.abs(c.low - pc));
+    }
+  }
+  // Wilder's smoothing
+  const out = new Array(n).fill(NA);
+  let prev = NA;
+  for (let i = 0; i < n; i++) {
+    if (i === period - 1) {
+      let s = 0;
+      for (let j = 0; j < period; j++) s += tr[j];
+      prev = s / period;
+      out[i] = prev;
+    } else if (i >= period) {
+      prev = (prev * (period - 1) + tr[i]) / period;
+      out[i] = prev;
+    }
+  }
+  return out;
+}
+
+// On-Balance Volume.
+export function obv(candles: Candle[]): number[] {
+  const out = new Array(candles.length).fill(NA);
+  let acc = 0;
+  for (let i = 0; i < candles.length; i++) {
+    if (i === 0) acc = 0;
+    else if (candles[i].close > candles[i - 1].close) acc += candles[i].volume;
+    else if (candles[i].close < candles[i - 1].close) acc -= candles[i].volume;
+    out[i] = acc;
+  }
+  return out;
+}
+
+// Williams %R (range -100..0).
+export function williamsR(candles: Candle[], period = 14): number[] {
+  const n = candles.length;
+  const out = new Array(n).fill(NA);
+  for (let i = period - 1; i < n; i++) {
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      hi = Math.max(hi, candles[j].high);
+      lo = Math.min(lo, candles[j].low);
+    }
+    const denom = hi - lo || 1e-9;
+    out[i] = ((hi - candles[i].close) / denom) * -100;
+  }
+  return out;
+}
+
+// Rate of Change (%).
+export function roc(values: number[], period = 12): number[] {
+  const out = new Array(values.length).fill(NA);
+  for (let i = period; i < values.length; i++) {
+    const base = values[i - period] || 1e-9;
+    out[i] = ((values[i] - base) / base) * 100;
+  }
+  return out;
+}
+
+// Parabolic SAR (overlay dots).
+export function psar(candles: Candle[], step = 0.02, max = 0.2): number[] {
+  const n = candles.length;
+  const out = new Array(n).fill(NA);
+  if (n < 2) return out;
+  let bull = candles[1].close >= candles[0].close;
+  let af = step;
+  let ep = bull ? candles[0].high : candles[0].low;
+  let sar = bull ? candles[0].low : candles[0].high;
+  for (let i = 1; i < n; i++) {
+    sar = sar + af * (ep - sar);
+    const c = candles[i];
+    if (bull) {
+      sar = Math.min(sar, candles[i - 1].low, i >= 2 ? candles[i - 2].low : candles[i - 1].low);
+      if (c.low < sar) {
+        bull = false;
+        sar = ep;
+        ep = c.low;
+        af = step;
+      } else if (c.high > ep) {
+        ep = c.high;
+        af = Math.min(af + step, max);
+      }
+    } else {
+      sar = Math.max(sar, candles[i - 1].high, i >= 2 ? candles[i - 2].high : candles[i - 1].high);
+      if (c.high > sar) {
+        bull = true;
+        sar = ep;
+        ep = c.high;
+        af = step;
+      } else if (c.low < ep) {
+        ep = c.low;
+        af = Math.min(af + step, max);
+      }
+    }
+    out[i] = round4(sar);
+  }
+  return out;
+}
+
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
+// SMA over a series that may contain NaN (used to smooth %K etc.).
+function smaIgnoreNaN(values: number[], period: number): number[] {
+  const out = new Array(values.length).fill(NA);
+  const buf: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (Number.isNaN(values[i])) continue;
+    buf.push(values[i]);
+    if (buf.length > period) buf.shift();
+    if (buf.length === period) out[i] = buf.reduce((a, b) => a + b, 0) / period;
+  }
+  return out;
+}
+
 // Build {time,value} points dropping NaN — ready for lightweight-charts setData.
 export function toLine(candles: Candle[], series: number[]): LinePoint[] {
   const pts: LinePoint[] = [];

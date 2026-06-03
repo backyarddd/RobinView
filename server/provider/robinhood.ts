@@ -32,8 +32,43 @@ export class RobinhoodConnection {
   private _connecting = false;
   private lastError: string | null = null;
 
+  // Account data (accounts, holdings, balances) changes only when you trade, so
+  // it is cached and refreshed slowly. Live valuation happens against the quote
+  // stream — NOT by re-hitting the broker every tick. On a transient error we
+  // serve the last good value instead of an empty flicker.
+  private cache = new Map<string, { at: number; data: any }>();
+  private inflight = new Map<string, Promise<any>>();
+  private static TTL = { accounts: 60_000, holdings: 20_000, portfolio: 20_000, orders: 30_000 };
+
   constructor(redirectUri: string, private url: string = DEFAULT_URL) {
     this.auth = new FileOAuthProvider(redirectUri);
+  }
+
+  // Cached fetch with single-flight + last-good fallback.
+  private async cached<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
+    const hit = this.cache.get(key);
+    if (hit && Date.now() - hit.at < ttl) return hit.data as T;
+    const pending = this.inflight.get(key);
+    if (pending) return pending as Promise<T>;
+    const p = (async () => {
+      try {
+        const data = await fetcher();
+        this.cache.set(key, { at: Date.now(), data });
+        return data;
+      } catch (err) {
+        if (hit) return hit.data as T; // serve stale rather than flicker
+        throw err;
+      } finally {
+        this.inflight.delete(key);
+      }
+    })();
+    this.inflight.set(key, p);
+    return p;
+  }
+
+  /** Drop cached account data (e.g. after the user places a trade). */
+  invalidateAccountCache() {
+    this.cache.clear();
   }
 
   status() {
@@ -132,55 +167,63 @@ export class RobinhoodConnection {
   }
 
   async getAccounts(): Promise<Account[]> {
-    const data = await this.call("get_accounts");
-    return (data.accounts ?? []).map((a: any) => ({
-      accountNumber: a.account_number,
-      type: a.type,
-      brokerageAccountType: a.brokerage_account_type,
-      nickname: a.nickname,
-      isDefault: !!a.is_default,
-      agenticAllowed: !!a.agentic_allowed,
-      optionLevel: a.option_level ?? "",
-    }));
+    return this.cached("accounts", RobinhoodConnection.TTL.accounts, async () => {
+      const data = await this.call("get_accounts");
+      return (data.accounts ?? []).map((a: any) => ({
+        accountNumber: a.account_number,
+        type: a.type,
+        brokerageAccountType: a.brokerage_account_type,
+        nickname: a.nickname,
+        isDefault: !!a.is_default,
+        agenticAllowed: !!a.agentic_allowed,
+        optionLevel: a.option_level ?? "",
+      }));
+    });
   }
 
   async getHoldings(account: string): Promise<RawHolding[]> {
-    const data = await this.call("get_equity_positions", { account_number: account });
-    return (data.positions ?? []).map((p: any) => ({
-      symbol: String(p.symbol).toUpperCase(),
-      quantity: num(p.quantity),
-      averageBuyPrice: num(p.average_buy_price),
-    }));
+    return this.cached(`holdings:${account}`, RobinhoodConnection.TTL.holdings, async () => {
+      const data = await this.call("get_equity_positions", { account_number: account });
+      return (data.positions ?? []).map((p: any) => ({
+        symbol: String(p.symbol).toUpperCase(),
+        quantity: num(p.quantity),
+        averageBuyPrice: num(p.average_buy_price),
+      }));
+    });
   }
 
   async getPortfolio(account: string): Promise<RawPortfolio> {
-    const d = await this.call("get_portfolio", { account_number: account });
-    return {
-      cash: num(d.cash),
-      buyingPower: num(d.buying_power?.buying_power),
-      pendingDeposits: num(d.pending_deposits),
-      equityValue: num(d.equity_value),
-      totalValue: num(d.total_value),
-      optionsValue: num(d.options_value),
-      cryptoValue: num(d.crypto_value),
-      currency: d.currency ?? "USD",
-    };
+    return this.cached(`portfolio:${account}`, RobinhoodConnection.TTL.portfolio, async () => {
+      const d = await this.call("get_portfolio", { account_number: account });
+      return {
+        cash: num(d.cash),
+        buyingPower: num(d.buying_power?.buying_power),
+        pendingDeposits: num(d.pending_deposits),
+        equityValue: num(d.equity_value),
+        totalValue: num(d.total_value),
+        optionsValue: num(d.options_value),
+        cryptoValue: num(d.crypto_value),
+        currency: d.currency ?? "USD",
+      };
+    });
   }
 
   async getOrders(account: string): Promise<OrderRow[]> {
-    const data = await this.call("get_equity_orders", { account_number: account });
-    return (data.orders ?? []).slice(0, 50).map((o: any) => ({
-      id: o.id,
-      symbol: o.symbol ?? "",
-      side: o.side,
-      type: o.type,
-      state: o.state,
-      quantity: num(o.quantity),
-      price: o.price ? num(o.price) : undefined,
-      averageFillPrice: o.average_price ? num(o.average_price) : undefined,
-      createdAt: o.created_at ? Date.parse(o.created_at) : Date.now(),
-      placedAgent: o.placed_agent,
-    }));
+    return this.cached(`orders:${account}`, RobinhoodConnection.TTL.orders, async () => {
+      const data = await this.call("get_equity_orders", { account_number: account });
+      return (data.orders ?? []).slice(0, 50).map((o: any) => ({
+        id: o.id,
+        symbol: o.symbol ?? "",
+        side: o.side,
+        type: o.type,
+        state: o.state,
+        quantity: num(o.quantity),
+        price: o.price ? num(o.price) : undefined,
+        averageFillPrice: o.average_price ? num(o.average_price) : undefined,
+        createdAt: o.created_at ? Date.parse(o.created_at) : Date.now(),
+        placedAgent: o.placed_agent,
+      }));
+    });
   }
 }
 

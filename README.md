@@ -40,8 +40,9 @@ another app's credentials or copies data out of anything else.
 **Charting**
 - Candlestick / area / line charts powered by [`lightweight-charts`](https://github.com/tradingview/lightweight-charts) (TradingView's own open-source engine)
 - 7 timeframes (1D → ALL), volume histogram, crosshair OHLC readout
-- Overlays: **SMA 20/50, EMA 21, Bollinger Bands, VWAP**
-- Synced oscillator pane: **RSI (14)** and **MACD (12/26/9)**
+- **Drawing tools**: trend line, ray, horizontal/vertical line, rectangle, Fibonacci retracement, freehand brush, text notes — color picker, select & delete, persisted per symbol
+- Overlays: **SMA 20/50/100/200, EMA 9/21/50, Bollinger Bands, VWAP, Parabolic SAR**
+- Synced oscillator pane: **RSI, MACD, Stochastic, Williams %R, ATR, OBV, Rate of Change**
 - Live last-price streamed into the forming candle
 
 **Portfolio**

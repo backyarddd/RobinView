@@ -158,19 +158,29 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   refreshAccount: async () => {
-    const accounts = await api.accounts().catch(() => []);
+    const accounts = await api.accounts().catch(() => [] as Account[]);
+    // Keep the existing account list if a refresh transiently returns nothing.
+    const accts = accounts.length ? accounts : get().accounts;
+    const current = get().account;
     const account =
-      accounts.find((a) => a.isDefault)?.accountNumber || accounts[0]?.accountNumber || "";
-    set({ accounts, account });
+      (current && accts.find((a) => a.accountNumber === current)?.accountNumber) ||
+      accts.find((a) => a.isDefault)?.accountNumber ||
+      accts[0]?.accountNumber ||
+      "";
+    set({ accounts: accts, account });
     if (ws && ws.readyState === WebSocket.OPEN && account)
       ws.send(JSON.stringify({ type: "setAccount", account }));
     if (account) {
       const [portfolio, positions, orders] = await Promise.all([
-        api.portfolio(account).catch(() => null),
-        api.positions(account).catch(() => []),
-        api.orders(account).catch(() => []),
+        api.portfolio(account).catch(() => get().portfolio),
+        api.positions(account).catch(() => get().positions),
+        api.orders(account).catch(() => get().orders),
       ]);
-      set({ portfolio, positions, orders });
+      set({
+        portfolio: portfolio ?? get().portfolio,
+        positions: positions.length ? positions : get().positions,
+        orders: orders.length ? orders : get().orders,
+      });
       subscribeAll(get);
     }
   },
@@ -235,6 +245,8 @@ export const useStore = create<StoreState>((set, get) => ({
       const trail = [...get().equityTrail, { t: Date.now(), v: msg.portfolio.totalValue }].slice(-120);
       set({ portfolio: msg.portfolio, equityTrail: trail });
     } else if (msg.type === "positions") {
+      // Ignore a transient empty push while we still hold positions (avoids flicker).
+      if (msg.positions.length === 0 && get().positions.length > 0) return;
       set({ positions: msg.positions });
     } else if (msg.type === "hello") {
       set({ mode: msg.mode, connected: true });

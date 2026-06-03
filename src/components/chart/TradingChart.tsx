@@ -11,7 +11,9 @@ import {
 import type { Candle, Timeframe } from "@shared/types";
 import { api } from "../../lib/api";
 import { useStore } from "../../store/useStore";
-import { ChartToolbar, type ChartType, type IndicatorKey } from "./ChartToolbar";
+import { ChartToolbar, OSCILLATORS, type ChartType, type IndicatorKey } from "./ChartToolbar";
+import { DrawingLayer, type DrawTool, type Drawing } from "./DrawingLayer";
+import { DrawingToolbar } from "./DrawingToolbar";
 import {
   sma,
   ema,
@@ -19,6 +21,12 @@ import {
   vwap,
   rsi,
   macd,
+  stochastic,
+  atr,
+  obv,
+  williamsR,
+  roc,
+  psar,
   toLine,
   closes,
 } from "../../lib/indicators";
@@ -37,8 +45,13 @@ const THEME = {
 const OVERLAY_COLORS: Record<string, string> = {
   sma20: "#e3b766",
   sma50: "#6fa8ff",
+  sma100: "#f2748f",
+  sma200: "#9bd45a",
+  ema9: "#5ad1c4",
   ema21: "#c08bff",
-  vwap: "#ff9f7a",
+  ema50: "#ff9f7a",
+  vwap: "#ffd479",
+  psar: "#7fd0ff",
   bbU: "rgba(111,227,196,0.5)",
   bbL: "rgba(111,227,196,0.5)",
   bbM: "rgba(111,227,196,0.25)",
@@ -70,13 +83,14 @@ export function TradingChart({ symbol }: { symbol: string }) {
   const [indicators, setIndicators] = useState<Set<IndicatorKey>>(new Set(["sma20", "volume"]));
   const [legend, setLegend] = useState<Legend | null>(null);
   const [loading, setLoading] = useState(true);
+  const [drawTool, setDrawTool] = useState<DrawTool>("cursor");
+  const [drawColor, setDrawColor] = useState("#34e29b");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const [chartNonce, setChartNonce] = useState(0); // bumps when chart/series (re)created
 
   const liveQuote = useStore((s) => s.quotes[symbol]);
-  const osc: "rsi" | "macd" | null = indicators.has("rsi")
-    ? "rsi"
-    : indicators.has("macd")
-      ? "macd"
-      : null;
+  const osc: IndicatorKey | null = OSCILLATORS.find((k) => indicators.has(k)) ?? null;
 
   // ---- create main chart once ----
   useEffect(() => {
@@ -166,6 +180,7 @@ export function TradingChart({ symbol }: { symbol: string }) {
         priceLineColor: "rgba(255,255,255,0.25)",
       });
     }
+    setChartNonce((n) => n + 1); // signal the drawing layer that the series is ready
   }, [type]);
 
   // ---- fetch data when symbol/tf changes ----
@@ -256,13 +271,30 @@ export function TradingChart({ symbol }: { symbol: string }) {
     };
     if (indicators.has("sma20")) addLine("sma20", toLine(cs, sma(c, 20)), OVERLAY_COLORS.sma20);
     if (indicators.has("sma50")) addLine("sma50", toLine(cs, sma(c, 50)), OVERLAY_COLORS.sma50);
+    if (indicators.has("sma100")) addLine("sma100", toLine(cs, sma(c, 100)), OVERLAY_COLORS.sma100);
+    if (indicators.has("sma200")) addLine("sma200", toLine(cs, sma(c, 200)), OVERLAY_COLORS.sma200);
+    if (indicators.has("ema9")) addLine("ema9", toLine(cs, ema(c, 9)), OVERLAY_COLORS.ema9);
     if (indicators.has("ema21")) addLine("ema21", toLine(cs, ema(c, 21)), OVERLAY_COLORS.ema21);
+    if (indicators.has("ema50")) addLine("ema50", toLine(cs, ema(c, 50)), OVERLAY_COLORS.ema50);
     if (indicators.has("vwap")) addLine("vwap", toLine(cs, vwap(cs)), OVERLAY_COLORS.vwap);
     if (indicators.has("bb")) {
       const b = bollinger(c, 20, 2);
       addLine("bbU", toLine(cs, b.upper), OVERLAY_COLORS.bbU, 1);
       addLine("bbM", toLine(cs, b.middle), OVERLAY_COLORS.bbM, 1);
       addLine("bbL", toLine(cs, b.lower), OVERLAY_COLORS.bbL, 1);
+    }
+    if (indicators.has("psar")) {
+      // Render SAR as a dotted line so it reads as a dot trail without a marker plugin.
+      const ls = chart.addLineSeries({
+        color: OVERLAY_COLORS.psar,
+        lineWidth: 1,
+        lineStyle: 1, // dotted
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      ls.setData(toLine(cs, psar(cs)).map((p) => ({ time: p.time as Time, value: p.value })));
+      overlayRefs.current["psar"] = ls;
     }
   }
 
@@ -322,13 +354,17 @@ export function TradingChart({ symbol }: { symbol: string }) {
     oscRefs.current.forEach((s) => chart.removeSeries(s));
     oscRefs.current = [];
     const c = closes(cs);
+    const line = (color: string, w = 2) =>
+      chart.addLineSeries({ color, lineWidth: w as any, priceLineVisible: false, lastValueVisible: true });
+    const band = (price: number, color: string, title: string) =>
+      oscRefs.current[0]?.createPriceLine({ price, color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title });
+
     if (osc === "rsi") {
-      const r = rsi(c, 14);
-      const line = chart.addLineSeries({ color: "#c08bff", lineWidth: 2, priceLineVisible: false });
-      line.setData(toLine(cs, r).map((p) => ({ time: p.time as Time, value: p.value })));
-      line.createPriceLine({ price: 70, color: "rgba(255,106,87,0.4)", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "70" });
-      line.createPriceLine({ price: 30, color: "rgba(52,226,155,0.4)", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "30" });
-      oscRefs.current = [line];
+      const l = line("#c08bff");
+      l.setData(toLine(cs, rsi(c, 14)).map((p) => ({ time: p.time as Time, value: p.value })));
+      oscRefs.current = [l];
+      band(70, "rgba(255,106,87,0.4)", "70");
+      band(30, "rgba(52,226,155,0.4)", "30");
     } else if (osc === "macd") {
       const m = macd(c);
       const hist = chart.addHistogramSeries({ priceLineVisible: false });
@@ -339,11 +375,39 @@ export function TradingChart({ symbol }: { symbol: string }) {
           color: (m.histogram[i] ?? 0) >= 0 ? "rgba(52,226,155,0.45)" : "rgba(255,106,87,0.45)",
         })),
       );
-      const macdLine = chart.addLineSeries({ color: "#6fa8ff", lineWidth: 2, priceLineVisible: false });
+      const macdLine = line("#6fa8ff");
       macdLine.setData(toLine(cs, m.macd).map((p) => ({ time: p.time as Time, value: p.value })));
-      const sigLine = chart.addLineSeries({ color: "#e3b766", lineWidth: 1, priceLineVisible: false });
+      const sigLine = line("#e3b766", 1);
       sigLine.setData(toLine(cs, m.signal).map((p) => ({ time: p.time as Time, value: p.value })));
       oscRefs.current = [hist, macdLine, sigLine];
+    } else if (osc === "stoch") {
+      const s = stochastic(cs, 14, 3, 3);
+      const kL = line("#6fa8ff");
+      kL.setData(toLine(cs, s.k).map((p) => ({ time: p.time as Time, value: p.value })));
+      const dL = line("#e3b766", 1);
+      dL.setData(toLine(cs, s.d).map((p) => ({ time: p.time as Time, value: p.value })));
+      oscRefs.current = [kL, dL];
+      band(80, "rgba(255,106,87,0.4)", "80");
+      band(20, "rgba(52,226,155,0.4)", "20");
+    } else if (osc === "williams") {
+      const l = line("#c08bff");
+      l.setData(toLine(cs, williamsR(cs, 14)).map((p) => ({ time: p.time as Time, value: p.value })));
+      oscRefs.current = [l];
+      band(-20, "rgba(255,106,87,0.4)", "-20");
+      band(-80, "rgba(52,226,155,0.4)", "-80");
+    } else if (osc === "atr") {
+      const l = line("#ff9f7a");
+      l.setData(toLine(cs, atr(cs, 14)).map((p) => ({ time: p.time as Time, value: p.value })));
+      oscRefs.current = [l];
+    } else if (osc === "obv") {
+      const l = line("#5ad1c4");
+      l.setData(toLine(cs, obv(cs)).map((p) => ({ time: p.time as Time, value: p.value })));
+      oscRefs.current = [l];
+    } else if (osc === "roc") {
+      const l = line("#9bd45a");
+      l.setData(toLine(cs, roc(c, 12)).map((p) => ({ time: p.time as Time, value: p.value })));
+      oscRefs.current = [l];
+      band(0, "rgba(255,255,255,0.2)", "0");
     }
     chart.timeScale().fitContent();
   }
@@ -364,14 +428,38 @@ export function TradingChart({ symbol }: { symbol: string }) {
     }
   }, [liveQuote, type]);
 
+  // load/persist drawings per symbol
+  useEffect(() => {
+    try {
+      setDrawings(JSON.parse(localStorage.getItem(`robinview.drawings.${symbol}`) || "[]"));
+    } catch {
+      setDrawings([]);
+    }
+    setSelectedId(null);
+  }, [symbol]);
+
+  const updateDrawings = useCallback(
+    (next: Drawing[]) => {
+      setDrawings(next);
+      localStorage.setItem(`robinview.drawings.${symbol}`, JSON.stringify(next));
+    },
+    [symbol],
+  );
+
+  // disable chart pan/zoom while a drawing tool is active so drawing doesn't scroll
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const drawing = drawTool !== "cursor";
+    chartRef.current.applyOptions({ handleScroll: !drawing, handleScale: !drawing });
+  }, [drawTool, chartNonce]);
+
   const toggle = (k: IndicatorKey) => {
     setIndicators((prev) => {
       const next = new Set(prev);
       if (next.has(k)) next.delete(k);
       else {
-        // rsi and macd are mutually exclusive (single oscillator pane)
-        if (k === "rsi") next.delete("macd");
-        if (k === "macd") next.delete("rsi");
+        // Only one oscillator at a time (single lower pane).
+        if (OSCILLATORS.includes(k)) OSCILLATORS.forEach((o) => next.delete(o));
         next.add(k);
       }
       return next;
@@ -392,6 +480,36 @@ export function TradingChart({ symbol }: { symbol: string }) {
       <div className="chart-wrap">
         <div ref={hostRef} className="chart-host" style={{ bottom: osc ? "30%" : 0 }} />
         {osc && <div ref={oscRef} className="chart-host" style={{ top: "70%", borderTop: "1px solid var(--line)" }} />}
+        <div className="draw-host" style={{ bottom: osc ? "30%" : 0 }}>
+          {chartNonce > 0 && chartRef.current && mainSeriesRef.current && (
+            <DrawingLayer
+              chart={chartRef.current}
+              series={mainSeriesRef.current}
+              tool={drawTool}
+              color={drawColor}
+              drawings={drawings}
+              onChange={updateDrawings}
+              onCommit={() => setDrawTool("cursor")}
+              selectedId={selectedId}
+              setSelectedId={setSelectedId}
+            />
+          )}
+        </div>
+        <DrawingToolbar
+          tool={drawTool}
+          setTool={setDrawTool}
+          color={drawColor}
+          setColor={setDrawColor}
+          hasSelection={!!selectedId}
+          onDeleteSelected={() => {
+            if (selectedId) updateDrawings(drawings.filter((d) => d.id !== selectedId));
+            setSelectedId(null);
+          }}
+          onClear={() => {
+            updateDrawings([]);
+            setSelectedId(null);
+          }}
+        />
         <div className="chart-legend">
           <div className="row" style={{ fontWeight: 700, fontFamily: "var(--font-display)", fontSize: 14 }}>
             {symbol}
