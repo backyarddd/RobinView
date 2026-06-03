@@ -1,21 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="420" height="96" viewBox="0 0 420 96" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="96" viewBox="0 0 430 96" fill="none">
   <defs>
-    <linearGradient id="b" x1="6" y1="52" x2="52" y2="14" gradientUnits="userSpaceOnUse">
+    <linearGradient id="lg" x1="22" y1="74" x2="70" y2="22" gradientUnits="userSpaceOnUse">
       <stop stop-color="#1E7A56"/><stop offset="1" stop-color="#34E29B"/>
     </linearGradient>
-    <linearGradient id="r" x1="40" y1="14" x2="58" y2="34" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F0C878"/><stop offset="1" stop-color="#D49A3E"/>
-    </linearGradient>
+    <clipPath id="lc"><circle cx="46" cy="48" r="24.5"/></clipPath>
   </defs>
-  <g transform="translate(16,16)">
-    <path d="M6 50 L18 44 L27 33 L37 36 L48 22 Q52 18 50 30 Q48 42 38 48 L30 52 Q18 56 6 50 Z" fill="url(#b)"/>
-    <path d="M19 44 L28 35 L37 38 L47 26" stroke="#0A0C0B" stroke-opacity="0.45" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="49" cy="20" r="9" fill="url(#r)"/>
-    <circle cx="51.5" cy="18.5" r="1.7" fill="#0A0C0B"/>
-    <path d="M57 20 L63 18.5 L57.5 23.5 Z" fill="#D49A3E"/>
-    <path d="M6 50 L2 57" stroke="#34E29B" stroke-width="3" stroke-linecap="round"/>
+  <!-- aperture lens framing a rising market line -->
+  <circle cx="46" cy="48" r="30" fill="#0f1311" stroke="#E3B766" stroke-width="2.5"/>
+  <circle cx="46" cy="48" r="30" fill="none" stroke="#E3B766" stroke-opacity="0.16" stroke-width="7"/>
+  <g clip-path="url(#lc)">
+    <path d="M22 65 L33 57 L41 61 L51 46 L61 51 L72 31 L72 73 L22 73 Z" fill="url(#lg)" fill-opacity="0.26"/>
+    <path d="M22 65 L33 57 L41 61 L51 46 L61 51 L72 31" stroke="#34E29B" stroke-width="2.6"
+          fill="none" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <text x="104" y="62" font-family="Fraunces, Georgia, serif" font-size="46" font-weight="500" letter-spacing="-0.5">
+  <circle cx="61" cy="51" r="2.6" fill="#0f1311" stroke="#34E29B" stroke-width="1.6"/>
+  <circle cx="61" cy="35" r="3.4" fill="#E3B766"/>
+  <text x="96" y="61" font-family="Fraunces, Georgia, serif" font-size="44" font-weight="500" letter-spacing="-0.5">
     <tspan fill="#EEF2EE">Robin</tspan><tspan fill="#E3B766">View</tspan>
   </text>
 </svg>

@@ -102,6 +102,17 @@ a.news-row:hover {
 a.news-row:hover .news-title {
   color: var(--text-1);
 }
+.news-summary {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-3);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .news-meta {
   display: flex;
   align-items: center;
@@ -136,7 +147,7 @@ a.news-row:hover .news-title {
 
 /* ====================  SCREENER  ==================== */
 .scr-tbl tbody td:nth-child(3) {
-  /* Change% cell holds a pill — keep it tidy on the right */
+  /* Change% cell holds a pill - keep it tidy on the right */
   text-align: right;
 }
 .scr-tbl tbody td:nth-child(3) .pill {
@@ -246,6 +257,39 @@ a.news-row:hover .news-title {
   margin: 0 2px;
 }
 
+/* ====================  SETTINGS ROWS  ==================== */
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-faint);
+}
+.set-row:last-child {
+  border-bottom: none;
+}
+.set-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.set-row-label {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.set-row-sub {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.set-row .btn.sm,
+.set-row .acct-select {
+  flex-shrink: 0;
+}
+.set-danger:hover {
+  color: var(--down);
+  border-color: var(--down-dim);
+}
+
 /* ====================  MARKET CLOCK CHIP  ==================== */
 .mclock {
   display: inline-flex;
@@ -280,11 +324,21 @@ a.news-row:hover .news-title {
   line-height: 1.15;
 }
 .mclock-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-2);
+}
+.mclock-time {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
 }
 .mclock.open .mclock-label {
   color: var(--up);

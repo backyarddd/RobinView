@@ -2,7 +2,7 @@ import type { Fundamentals } from "../../shared/types.js";
 import { fetchWithTimeout, getYahooCrumb, rawNum as raw, numU as num } from "./util.js";
 
 // Real fundamentals from Yahoo Finance (keyless, but cookie+crumb gated).
-// Primary:  v10 quoteSummary (rich modules) — needs a cookie + crumb pair.
+// Primary:  v10 quoteSummary (rich modules) - needs a cookie + crumb pair.
 // Fallback: v8 chart meta (already keyless) so the endpoint never hard-fails.
 const TTL = 5 * 60_000;
 const cache = new Map<string, { at: number; data: Fundamentals }>();
@@ -57,6 +57,11 @@ async function fromQuoteSummary(sym: string): Promise<Fundamentals | null> {
   return null;
 }
 
+// Convert a fractional yield (0.0052) to a percentage number (0.52).
+function scalePct(v: number | undefined): number | undefined {
+  return v == null ? undefined : v * 100;
+}
+
 function mapQuoteSummary(sym: string, r: any): Fundamentals {
   const price = r.price ?? {};
   const sd = r.summaryDetail ?? {};
@@ -79,7 +84,9 @@ function mapQuoteSummary(sym: string, r: any): Fundamentals {
     peRatio: raw(sd.trailingPE),
     forwardPe: raw(sd.forwardPE) ?? raw(ks.forwardPE),
     eps: raw(ks.trailingEps),
-    dividendYield: raw(sd.dividendYield),
+    // Yahoo returns dividendYield as a fraction (0.0052 = 0.52%); the UI's
+    // percent() does not scale, so normalize to a percentage number here.
+    dividendYield: scalePct(raw(sd.dividendYield)),
     beta: raw(sd.beta) ?? raw(ks.beta),
     week52High: raw(sd.fiftyTwoWeekHigh),
     week52Low: raw(sd.fiftyTwoWeekLow),

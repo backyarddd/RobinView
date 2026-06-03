@@ -71,7 +71,7 @@ a {
   text-decoration: none;
 }
 
-/* — Tabular numerics everywhere data lives — */
+/* - Tabular numerics everywhere data lives - */
 .mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -106,7 +106,7 @@ a {
   color: var(--text-3);
 }
 
-/* — Scrollbars — */
+/* - Scrollbars - */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
@@ -136,7 +136,7 @@ a {
   outline-offset: 2px;
 }
 
-/* — Shared keyframes — */
+/* - Shared keyframes - */
 @keyframes rv-fade-up {
   from {
     opacity: 0;

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="96" viewBox="0 0 430 96" fill="none">
+  <defs>
+    <linearGradient id="lgl" x1="22" y1="74" x2="70" y2="22" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E7A56"/><stop offset="1" stop-color="#34E29B"/>
+    </linearGradient>
+    <clipPath id="lcl"><circle cx="46" cy="48" r="24.5"/></clipPath>
+  </defs>
+  <!-- light-background variant: dark lens, dark "Robin" wordmark -->
+  <circle cx="46" cy="48" r="30" fill="#0f1311" stroke="#C79A45" stroke-width="2.5"/>
+  <g clip-path="url(#lcl)">
+    <path d="M22 65 L33 57 L41 61 L51 46 L61 51 L72 31 L72 73 L22 73 Z" fill="url(#lgl)" fill-opacity="0.30"/>
+    <path d="M22 65 L33 57 L41 61 L51 46 L61 51 L72 31" stroke="#1E9A6E" stroke-width="2.6"
+          fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <circle cx="61" cy="51" r="2.6" fill="#0f1311" stroke="#1E9A6E" stroke-width="1.6"/>
+  <circle cx="61" cy="35" r="3.4" fill="#C79A45"/>
+  <text x="96" y="61" font-family="Fraunces, Georgia, serif" font-size="44" font-weight="500" letter-spacing="-0.5">
+    <tspan fill="#15191b">Robin</tspan><tspan fill="#B8893A">View</tspan>
+  </text>
+</svg>

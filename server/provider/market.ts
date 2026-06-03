@@ -80,8 +80,11 @@ export function genCandles(
     p *= 1 + rets[i];
     closes.push(p);
   }
-  // Rescale path so the final close equals the live price exactly.
-  const scale = price / closes[n - 1];
+  // Rescale path so the final close equals the live price exactly. Guard against
+  // a halted symbol (price 0) or a degenerate final close (0/NaN/negative): in
+  // those cases don't rescale at all (scale = 1) so we never divide by 0/NaN.
+  const last = closes[n - 1];
+  const scale = price > 0 && Number.isFinite(last) && last > 0 ? price / last : 1;
   for (let i = 0; i < n; i++) closes[i] *= scale;
   start *= scale; // keep the first bar's open in the same scaled frame as the closes
   // Pin the penultimate close near prevClose for daily views (continuity of "today's" move).

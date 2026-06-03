@@ -1,4 +1,4 @@
-// Shared helpers for the server data providers — numeric coercion, rounding,
+// Shared helpers for the server data providers - numeric coercion, rounding,
 // and the Yahoo Finance HTTP primitives (timeout fetch + cookie/crumb auth).
 // Previously these were copy-pasted across quotes/history/news/screener/
 // fundamentals; this is the single source of truth.
@@ -7,6 +7,15 @@ export const YAHOO_UA = "Mozilla/5.0 (RobinView)";
 
 export function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * A known client-side / validation / not-connected error. The HTTP layer maps
+ * the attached `status` to a 4xx (vs. 502 for genuine upstream failures), while
+ * keeping the {error} JSON body shape the client expects.
+ */
+export function clientError(message: string, status = 409): Error & { status: number } {
+  return Object.assign(new Error(message), { status });
 }
 
 /** Coerce to a finite number, defaulting to 0 (for required fields). */

@@ -10,15 +10,18 @@ import type {
   Timeframe,
   AssetClass,
   RobinhoodStatus,
+  OrderRequest,
+  OrderReview,
+  OrderResult,
 } from "../../shared/types.js";
 import { fetchQuotes, searchSymbols } from "./quotes.js";
 import { fetchHistory } from "./history.js";
 import { genCandles, intervalFor } from "./market.js";
 import { RobinhoodConnection } from "./robinhood.js";
-import { round2 } from "./util.js";
+import { round2, clientError } from "./util.js";
 
 // The real-data provider. Market data (quotes, candles, search) is always live
-// from a keyless market source — this is the TradingView half and needs no auth.
+// from a keyless market source - this is the TradingView half and needs no auth.
 // Account data (accounts, portfolio, positions, orders) comes from RobinView's
 // own Robinhood MCP connection and is empty until the user connects.
 export class LiveProvider implements DataProvider {
@@ -104,8 +107,19 @@ export class LiveProvider implements DataProvider {
         assetClass: "equity" as AssetClass,
       };
     });
-    const total = positions.reduce((a, p) => a + p.marketValue, 0);
-    for (const p of positions) p.portfolioWeight = total ? p.marketValue / total : 0;
+    // Weight each position against the FULL account total (equities + options +
+    // crypto + cash), so PositionsTable weights agree with the portfolio total
+    // shown in PortfolioView. rh.getPortfolio is cached, so this is cheap.
+    const equityTotal = positions.reduce((a, p) => a + p.marketValue, 0);
+    let denom = equityTotal;
+    try {
+      const raw = await this.rh.getPortfolio(account);
+      const acctTotal = equityTotal + raw.optionsValue + raw.cryptoValue + raw.cash;
+      if (acctTotal > 0) denom = acctTotal;
+    } catch {
+      /* fall back to equities-only denominator on a transient portfolio error */
+    }
+    for (const p of positions) p.portfolioWeight = denom ? p.marketValue / denom : 0;
     return positions.sort((a, b) => b.marketValue - a.marketValue);
   }
 
@@ -115,11 +129,14 @@ export class LiveProvider implements DataProvider {
       this.rh.getPortfolio(account),
       pre ?? this.getPositions(account),
     ]);
-    // Revalue live from positions so the total ticks with the market.
+    // Revalue equities live from positions so the total ticks with the market.
+    // Options/crypto values come from the broker payload (we don't quote them
+    // live), and must be included so the Total equals equities+options+crypto+cash
+    // and position weights are computed against the true account total.
     const equityValue = positions.reduce((a, p) => a + p.marketValue, 0);
     const costBasis = positions.reduce((a, p) => a + p.costBasis, 0);
     const dayChange = positions.reduce((a, p) => a + p.dayChange, 0);
-    const totalValue = equityValue + raw.cash;
+    const totalValue = equityValue + raw.optionsValue + raw.cryptoValue + raw.cash;
     const prevTotal = totalValue - dayChange;
     const totalChange = equityValue - costBasis;
     return {
@@ -143,5 +160,25 @@ export class LiveProvider implements DataProvider {
   async getOrders(account: string): Promise<OrderRow[]> {
     if (!account || !this.rh.status().connected) return [];
     return this.rh.getOrders(account);
+  }
+
+  // ---- Order entry (requires a Robinhood connection) ----
+  async reviewOrder(account: string, req: OrderRequest): Promise<OrderReview> {
+    this.requireConnected();
+    return this.rh.reviewOrder(account, req);
+  }
+
+  async placeOrder(account: string, req: OrderRequest): Promise<OrderResult> {
+    this.requireConnected();
+    return this.rh.placeOrder(account, req);
+  }
+
+  async cancelOrder(account: string, orderId: string): Promise<OrderResult> {
+    this.requireConnected();
+    return this.rh.cancelOrder(account, orderId);
+  }
+
+  private requireConnected() {
+    if (!this.rh.status().connected) throw clientError("Connect Robinhood to trade.");
   }
 }

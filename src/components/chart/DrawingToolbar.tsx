@@ -1,5 +1,5 @@
 import type { DrawTool } from "./DrawingLayer";
-import { IconTrash, S } from "../common/icons";
+import { IconTrash, IconX, S } from "../common/icons";
 
 export const TOOL_META: Record<DrawTool, { name: string; desc: string }> = {
   cursor: { name: "Cursor", desc: "Select objects & pan / zoom the chart" },
@@ -34,25 +34,59 @@ export function ToolIcon({ tool, size = 17 }: { tool: DrawTool; size?: number })
   }
 }
 
+const WIDTHS = [1, 2, 3];
+
 export function DrawingToolbar({
   tool,
   setTool,
   color,
   setColor,
+  width,
+  setWidth,
+  dash,
+  setDash,
+  magnet,
+  setMagnet,
   hasSelection,
   onDeleteSelected,
   onClear,
+  onCollapse,
 }: {
   tool: DrawTool;
   setTool: (t: DrawTool) => void;
   color: string;
   setColor: (c: string) => void;
+  width: number;
+  setWidth: (n: number) => void;
+  dash: boolean;
+  setDash: (b: boolean) => void;
+  magnet: boolean;
+  setMagnet: (b: boolean) => void;
   hasSelection: boolean;
   onDeleteSelected: () => void;
   onClear: () => void;
+  onCollapse: () => void;
 }) {
+  // Cycle 1 -> 2 -> 3 -> 1. Compare against the nearest preset so a default like
+  // 1.5 still advances predictably.
+  const cycleWidth = () => {
+    const idx = WIDTHS.reduce(
+      (best, w, i) => (Math.abs(w - width) < Math.abs(WIDTHS[best] - width) ? i : best),
+      0,
+    );
+    setWidth(WIDTHS[(idx + 1) % WIDTHS.length]);
+  };
+  const curW = WIDTHS.reduce((b, w) => (Math.abs(w - width) < Math.abs(b - width) ? w : b), WIDTHS[0]);
   return (
     <div className="draw-toolbar">
+      <button className="draw-btn draw-collapse" onClick={onCollapse}>
+        <IconX size={15} />
+        <span className="draw-tip">
+          <b>Hide toolbar</b>
+          <i>Collapse the drawing tools</i>
+        </span>
+      </button>
+      <div className="draw-sep" />
       {ORDER.map((t) => (
         <button key={t} className={`draw-btn ${tool === t ? "on" : ""}`} onClick={() => setTool(t)}>
           <ToolIcon tool={t} />
@@ -73,6 +107,28 @@ export function DrawingToolbar({
           />
         ))}
       </div>
+      <div className="draw-sep" />
+      <button className="draw-btn" onClick={cycleWidth}>
+        <WidthIcon w={curW} />
+        <span className="draw-tip">
+          <b>Line width - {curW}px</b>
+          <i>Click to cycle 1 / 2 / 3 px</i>
+        </span>
+      </button>
+      <button className={`draw-btn ${dash ? "on" : ""}`} onClick={() => setDash(!dash)}>
+        <DashIcon dashed={dash} />
+        <span className="draw-tip">
+          <b>{dash ? "Dashed line" : "Solid line"}</b>
+          <i>Toggle dashed / solid stroke</i>
+        </span>
+      </button>
+      <button className={`draw-btn ${magnet ? "on" : ""}`} onClick={() => setMagnet(!magnet)}>
+        <MagnetIcon />
+        <span className="draw-tip">
+          <b>Magnet - snap to price</b>
+          <i>Snap drawn points to nearest OHLC</i>
+        </span>
+      </button>
       <div className="draw-sep" />
       <button
         className="draw-btn"
@@ -99,4 +155,29 @@ export function DrawingToolbar({
 
 function ClearIcon() {
   return <svg {...S(17)}><path d="M4 7h16M9 11v6M15 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /><path d="M3 3l18 18" strokeWidth="1.4" /></svg>;
+}
+
+// Three stacked horizontal lines with increasing weight to convey current width.
+function WidthIcon({ w }: { w: number }) {
+  return (
+    <svg {...S(17)}>
+      <path d="M4 7h16" strokeWidth={1} />
+      <path d="M4 12h16" strokeWidth={2} />
+      <path d="M4 17h16" strokeWidth={3.2} />
+      <circle cx="20.5" cy={w <= 1 ? 7 : w >= 3 ? 17 : 12} r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function DashIcon({ dashed }: { dashed: boolean }) {
+  return <svg {...S(17)}><path d="M3 12h18" strokeDasharray={dashed ? "4 3" : undefined} /></svg>;
+}
+
+function MagnetIcon() {
+  return (
+    <svg {...S(17)}>
+      <path d="M6 3v8a6 6 0 0 0 12 0V3" />
+      <path d="M6 7h4M14 7h4" />
+    </svg>
+  );
 }

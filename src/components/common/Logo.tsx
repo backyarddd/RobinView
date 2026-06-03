@@ -1,33 +1,28 @@
-// RobinView mark: a rising chart line whose crest lifts into a robin in flight.
-// The body is an emerald area (the "view"/market); the head & breast are brass.
+// RobinView mark: an aperture/lens (the "View") framing a rising market line,
+// with a brass focus dot at the high. Brass ring = the brand accent.
 export function LogoMark({ size = 32 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
       <defs>
-        <linearGradient id="rv-body" x1="6" y1="52" x2="52" y2="14" gradientUnits="userSpaceOnUse">
+        <linearGradient id="rv-fill" x1="32" y1="50" x2="32" y2="14" gradientUnits="userSpaceOnUse">
           <stop stopColor="#1E7A56" />
           <stop offset="1" stopColor="#34E29B" />
         </linearGradient>
-        <linearGradient id="rv-breast" x1="40" y1="14" x2="58" y2="34" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#F0C878" />
-          <stop offset="1" stopColor="#D49A3E" />
-        </linearGradient>
+        <clipPath id="rv-lens">
+          <circle cx="32" cy="32" r="22" />
+        </clipPath>
       </defs>
-      {/* rising area = bird body */}
-      <path
-        d="M6 50 L18 44 L27 33 L37 36 L48 22 Q52 18 50 30 Q48 42 38 48 L30 52 Q18 56 6 50 Z"
-        fill="url(#rv-body)"
-      />
-      {/* wing crease (a candle-tick echo) */}
-      <path d="M19 44 L28 35 L37 38 L47 26" stroke="#0A0C0B" strokeOpacity="0.45" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      {/* head */}
-      <circle cx="49" cy="20" r="9" fill="url(#rv-breast)" />
-      {/* eye */}
-      <circle cx="51.5" cy="18.5" r="1.7" fill="#0A0C0B" />
-      {/* beak */}
-      <path d="M57 20 L63 18.5 L57.5 23.5 Z" fill="#D49A3E" />
-      {/* tail tick */}
-      <path d="M6 50 L2 57" stroke="#34E29B" strokeWidth="3" strokeLinecap="round" />
+      {/* lens ring (the "View") */}
+      <circle cx="32" cy="32" r="27" fill="#0f1311" stroke="#E3B766" strokeWidth="2.4" />
+      <circle cx="32" cy="32" r="27" fill="none" stroke="#E3B766" strokeOpacity="0.16" strokeWidth="6" />
+      {/* rising market line + area, framed by the lens */}
+      <g clipPath="url(#rv-lens)">
+        <path d="M10.4 47.3 L20.3 40.1 L27.5 43.7 L36.5 30.2 L45.5 34.7 L55.4 16.7 L55.4 55 L10.4 55 Z" fill="url(#rv-fill)" fillOpacity="0.26" />
+        <path d="M10.4 47.3 L20.3 40.1 L27.5 43.7 L36.5 30.2 L45.5 34.7 L55.4 16.7" stroke="#34E29B" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+      {/* node on the line + brass focus dot at the high */}
+      <circle cx="45.5" cy="34.7" r="2.4" fill="#0f1311" stroke="#34E29B" strokeWidth="1.5" />
+      <circle cx="45.5" cy="20.3" r="3.1" fill="#E3B766" />
     </svg>
   );
 }

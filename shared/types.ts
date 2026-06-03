@@ -107,6 +107,44 @@ export interface SearchResult {
   instrumentId?: string;
 }
 
+// ── Order entry (maps to the Robinhood agentic order tools) ──────────────────
+export type OrderSide = "buy" | "sell";
+export type OrderType = "market" | "limit" | "stop_market" | "stop_limit";
+export type TimeInForce = "gfd" | "gtc";
+export type MarketHours = "regular_hours" | "extended_hours" | "all_day_hours";
+
+export interface OrderRequest {
+  symbol: string;
+  side: OrderSide;
+  type: OrderType;
+  quantity?: number; // shares (one of quantity / dollarAmount)
+  dollarAmount?: number; // USD notional - market orders only
+  limitPrice?: number; // required for limit / stop_limit
+  stopPrice?: number; // required for stop_market / stop_limit
+  timeInForce?: TimeInForce; // default gfd
+  marketHours?: MarketHours; // default regular_hours
+}
+
+// Result of a pre-trade simulation (review_equity_order).
+export interface OrderReview {
+  symbol: string;
+  side: OrderSide;
+  type: OrderType;
+  quantity?: number;
+  estimatedPrice?: number; // quote used for the estimate
+  estimatedCost?: number; // notional incl. computed shares for dollar orders
+  buyingPower?: number;
+  alerts: string[]; // pre-trade warnings (buying power, halt, PDT, …)
+  raw?: unknown; // full upstream payload for anything not modeled
+}
+
+export interface OrderResult {
+  ok: boolean;
+  id?: string;
+  state?: string;
+  message?: string;
+}
+
 export interface MarketMover {
   symbol: string;
   name: string;
@@ -123,7 +161,7 @@ export interface RobinhoodStatus {
   error?: string | null;
 }
 
-// ── Free market-data contracts (Yahoo) — shared by server providers & client ──
+// ── Free market-data contracts (Yahoo) - shared by server providers & client ──
 export interface Fundamentals {
   symbol: string;
   longName?: string;
@@ -151,6 +189,26 @@ export interface NewsItem {
   link: string;
   publishedAt?: number;
   thumbnail?: string;
+  summary?: string; // article description / standfirst, when the source provides one
+}
+
+// ── App self-update (checks the project's GitHub repo) ──────────────────────
+export interface UpdateInfo {
+  current: string; // version this running build reports
+  latest: string | null; // newest published release/tag, null if unknown
+  hasUpdate: boolean; // latest is strictly newer than current
+  url: string | null; // release page to read more
+  notes: string | null; // release body / changelog excerpt
+  publishedAt: number | null; // epoch ms of the latest release
+  channel: "release" | "tag" | "none"; // where `latest` came from
+}
+
+export interface UpdateResult {
+  ok: boolean;
+  version: string; // version after the attempt
+  message: string; // human-readable outcome (shown in the UI)
+  restartRequired: boolean; // true when the user must restart the server manually
+  output?: string; // tail of the git/npm output, for diagnostics
 }
 
 export interface ScreenerRow {

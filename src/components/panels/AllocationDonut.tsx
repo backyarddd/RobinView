@@ -6,20 +6,29 @@ const PALETTE = [
   "#5ad1c4", "#f2748f", "#9bd45a", "#ff6a57", "#7c8a82",
 ];
 
-export function AllocationDonut() {
+type Slice = { label: string; value: number; color: string; symbol?: string };
+
+export function AllocationDonut({ onOpenSymbol }: { onOpenSymbol?: (s: string) => void } = {}) {
   const positions = useStore((s) => s.positions);
   const portfolio = useStore((s) => s.portfolio);
   const select = useStore((s) => s.select);
+  const open = onOpenSymbol ?? select;
 
   const total = positions.reduce((a, p) => a + p.marketValue, 0);
   const cash = portfolio?.cash ?? 0;
-  const grand = total + cash;
+  const options = portfolio?.optionsValue ?? 0;
+  const crypto = portfolio?.cryptoValue ?? 0;
+  // Weigh against the true account total (equities + options + crypto + cash) so
+  // the donut reconciles with the Account Breakdown and the holdings weight bars.
+  const grand = portfolio?.totalValue ?? total + cash;
 
-  const slices = positions
+  const slices: Slice[] = positions
     .slice(0, 9)
-    .map((p, i) => ({ label: p.symbol, value: p.marketValue, color: PALETTE[i % PALETTE.length] }));
+    .map((p, i) => ({ label: p.symbol, value: p.marketValue, color: PALETTE[i % PALETTE.length], symbol: p.symbol }));
   const restValue = positions.slice(9).reduce((a, p) => a + p.marketValue, 0);
   if (restValue > 0) slices.push({ label: "Other", value: restValue, color: "#4a524d" });
+  if (options > 0) slices.push({ label: "Options", value: options, color: "#8a6fd0" });
+  if (crypto > 0) slices.push({ label: "Crypto", value: crypto, color: "#d0a24a" });
   if (cash > 0) slices.push({ label: "Cash", value: cash, color: "#2c322e" });
 
   const R = 54;
@@ -68,8 +77,8 @@ export function AllocationDonut() {
             <div
               key={i}
               className="donut-leg-row"
-              onClick={() => s.label.length <= 5 && select(s.label)}
-              style={{ cursor: s.label.length <= 5 ? "pointer" : "default" }}
+              onClick={() => s.symbol && open(s.symbol)}
+              style={{ cursor: s.symbol ? "pointer" : "default" }}
             >
               <span className="sw" style={{ background: s.color }} />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>

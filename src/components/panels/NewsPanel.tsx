@@ -67,6 +67,7 @@ export function NewsPanel({ symbol }: { symbol: string }) {
             >
               <div className="news-main">
                 <div className="news-title">{n.title}</div>
+                {n.summary && <div className="news-summary">{n.summary}</div>}
                 <div className="news-meta">
                   {n.publisher && <span className="news-pub">{n.publisher}</span>}
                   {n.publisher && n.publishedAt != null && <span className="news-dot">·</span>}

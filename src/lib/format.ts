@@ -1,4 +1,4 @@
-// Formatting helpers — all output is meant to sit in tabular-mono cells.
+// Formatting helpers - all output is meant to sit in tabular-mono cells.
 
 export function money(n: number, opts: { decimals?: number; sign?: boolean } = {}): string {
   const { decimals = 2, sign = false } = opts;
@@ -30,7 +30,7 @@ export function compactNum(n: number): string {
 
 export function percent(n: number, sign = true): string {
   const s = Math.abs(n).toFixed(2);
-  const p = n < 0 ? "−" : sign ? "+" : "";
+  const p = n < 0 ? "-" : sign ? "+" : "";
   return `${p}${s}%`;
 }
 

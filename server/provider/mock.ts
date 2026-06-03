@@ -9,11 +9,14 @@ import type {
   SearchResult,
   Timeframe,
   AssetClass,
+  OrderRequest,
+  OrderReview,
+  OrderResult,
 } from "../../shared/types.js";
 import { UNIVERSE, lookup, nameFor } from "./universe.js";
 import { genCandles, intervalFor, rng, hashSymbol } from "./market.js";
 import { fetchHistory } from "./history.js";
-import { round2 } from "./util.js";
+import { round2, clientError } from "./util.js";
 
 interface LiveState {
   price: number;
@@ -54,6 +57,9 @@ export class MockProvider implements DataProvider {
   readonly mode = "demo" as const;
   private state = new Map<string, LiveState>();
   private started = false;
+  // Orders the user simulates in this session, newest first (prepended to the demo set).
+  private placed: OrderRow[] = [];
+  private orderSeq = 1000;
 
   constructor() {
     for (const inst of UNIVERSE) {
@@ -135,7 +141,10 @@ export class MockProvider implements DataProvider {
 
   async getPositions(_account: string): Promise<Position[]> {
     const positions = DEMO_HOLDINGS.map((h) => this.buildPosition(h));
-    const total = positions.reduce((a, p) => a + p.marketValue, 0);
+    // Weight against the full account total (equities + cash) so demo weights
+    // are consistent with the displayed portfolio total. Demo has no options/
+    // crypto, so totalValue here is equities + cash.
+    const total = positions.reduce((a, p) => a + p.marketValue, 0) + DEMO_CASH;
     for (const p of positions) p.portfolioWeight = total ? p.marketValue / total : 0;
     return positions.sort((a, b) => b.marketValue - a.marketValue);
   }
@@ -230,6 +239,7 @@ export class MockProvider implements DataProvider {
       placedAgent: "user",
     });
     return [
+      ...this.placed,
       mk(1, "NVDA", "buy", "limit", "filled", 5, 220.0, 219.84),
       mk(2, "AAPL", "sell", "market", "filled", 3, 0, 314.9),
       mk(3, "TSLA", "buy", "limit", "confirmed", 2, 415.0),
@@ -237,6 +247,62 @@ export class MockProvider implements DataProvider {
       mk(5, "MU", "buy", "stop_limit", "queued", 4, 250.0),
       mk(6, "PLTR", "sell", "limit", "cancelled", 8, 190.0),
     ];
+  }
+
+  // ---- Order entry (simulated) ----
+  async reviewOrder(_account: string, req: OrderRequest): Promise<OrderReview> {
+    const q = this.quoteFor(req.symbol);
+    const refPrice = req.type === "limit" || req.type === "stop_limit" ? req.limitPrice ?? q.price : q.price;
+    // A zero/negative reference price makes shares-from-dollars Infinity and the
+    // estimated cost meaningless. Reject up front (a 4xx validation error).
+    if (!(refPrice > 0)) throw clientError("Enter a valid limit price greater than 0.", 400);
+    const qty = req.quantity ?? (req.dollarAmount ? req.dollarAmount / refPrice : 0);
+    const estimatedCost = round2(refPrice * qty);
+    const alerts: string[] = [];
+    if (req.side === "buy" && estimatedCost > DEMO_BUYING_POWER)
+      alerts.push(`Estimated cost ${estimatedCost.toFixed(2)} exceeds demo buying power ${DEMO_BUYING_POWER.toFixed(2)}.`);
+    const held = DEMO_HOLDINGS.find((h) => h.symbol === req.symbol.toUpperCase());
+    if (req.side === "sell" && req.quantity && (!held || req.quantity > held.quantity))
+      alerts.push(`Selling ${req.quantity} shares but you hold ${held?.quantity ?? 0}.`);
+    return {
+      symbol: req.symbol.toUpperCase(),
+      side: req.side,
+      type: req.type,
+      quantity: round2(qty),
+      estimatedPrice: refPrice,
+      estimatedCost,
+      buyingPower: DEMO_BUYING_POWER,
+      alerts,
+    };
+  }
+
+  async placeOrder(_account: string, req: OrderRequest): Promise<OrderResult> {
+    const q = this.quoteFor(req.symbol);
+    const refPrice = req.type === "limit" || req.type === "stop_limit" ? req.limitPrice ?? q.price : q.price;
+    // Guard against a zero/negative price → Infinity qty / zero-cost fill.
+    if (!(refPrice > 0)) throw clientError("Enter a valid limit price greater than 0.", 400);
+    const qty = req.quantity ?? (req.dollarAmount ? round2(req.dollarAmount / refPrice) : 0);
+    const market = req.type === "market";
+    const id = `sim-${this.orderSeq++}`;
+    this.placed.unshift({
+      id,
+      symbol: req.symbol.toUpperCase(),
+      side: req.side,
+      type: req.type,
+      state: market ? "filled" : "confirmed",
+      quantity: qty,
+      price: req.type === "market" ? undefined : refPrice,
+      averageFillPrice: market ? q.price : undefined,
+      createdAt: Date.now(),
+      placedAgent: "user",
+    });
+    return { ok: true, id, state: market ? "filled" : "confirmed", message: market ? "Filled (simulated)" : "Order placed (simulated)" };
+  }
+
+  async cancelOrder(_account: string, orderId: string): Promise<OrderResult> {
+    const o = this.placed.find((x) => x.id === orderId);
+    if (o) o.state = "cancelled";
+    return { ok: true, id: orderId, state: "cancelled", message: "Cancelled (simulated)" };
   }
 
   async search(query: string): Promise<SearchResult[]> {

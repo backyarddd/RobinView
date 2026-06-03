@@ -5,9 +5,20 @@ import type {
   Position,
   Quote,
   OrderRow,
+  OrderSide,
   WsMessage,
+  Timeframe,
+  UpdateInfo,
 } from "@shared/types";
 import { api } from "../lib/api";
+
+// What the trade ticket opens with. qty pre-fills the shares field (e.g. "close
+// position" passes the full holding); when absent the ticket starts empty.
+export interface TicketSeed {
+  symbol: string;
+  side: OrderSide;
+  qty?: number;
+}
 
 export interface Alert {
   id: string;
@@ -29,6 +40,23 @@ export interface WatchlistGroup {
   symbols: string[];
 }
 
+// Update slice: result of the GitHub version check + in-flight flags.
+export interface UpdateState {
+  info: UpdateInfo | null;
+  checking: boolean;
+  applying: boolean;
+  dismissed: boolean; // user closed the banner for this session
+  error: string | null;
+}
+
+// Baseline price for the selected chart timeframe, published by the chart so the
+// top bar can show the change OVER that period (not just the live daily move).
+export interface PeriodStart {
+  symbol: string;
+  tf: Timeframe;
+  price: number;
+}
+
 interface StoreState {
   mode: "live" | "demo" | "connecting";
   connected: boolean;
@@ -48,8 +76,23 @@ interface StoreState {
   selected: string;
   // small in-memory equity-curve trail for the sparkline header
   equityTrail: PriceHistoryPoint[];
+  ticket: TicketSeed | null; // open trade ticket (null = closed)
+  lastError: string | null; // most recent transient error (server WS / actions)
+  // ── Preferences (persisted) ──
+  hour12: boolean; // true = 12-hour clock (default), false = 24-hour
+  // ── Chart <-> top-bar shared state ──
+  chartTf: Timeframe; // active chart timeframe (1D…ALL)
+  periodStart: PeriodStart | null; // baseline price for the active timeframe
+  // ── Self-update ──
+  update: UpdateState;
 
   init: () => Promise<void>;
+  setHour12: (v: boolean) => void;
+  setChartTf: (tf: Timeframe) => void;
+  setPeriodStart: (p: PeriodStart) => void;
+  checkUpdate: (force?: boolean) => Promise<void>;
+  applyUpdate: () => Promise<void>;
+  dismissUpdate: () => void;
   setAccount: (account: string) => Promise<void>;
   select: (symbol: string) => void;
   addToWatchlist: (symbol: string) => void;
@@ -63,12 +106,26 @@ interface StoreState {
   connectRobinhood: () => Promise<void>;
   disconnectRobinhood: () => Promise<void>;
   refreshAccount: () => Promise<void>;
+  openTicket: (seed: TicketSeed) => void;
+  closeTicket: () => void;
   _ingest: (msg: WsMessage) => void;
 }
 
 const WATCHLIST_KEY = "robinview.watchlist"; // legacy single list (migrated)
 const WATCHLISTS_KEY = "robinview.watchlists.v2";
 const ALERTS_KEY = "robinview.alerts";
+const PREFS_KEY = "robinview.prefs";
+
+interface Prefs {
+  hour12: boolean;
+}
+function loadPrefs(): Prefs {
+  const p = load<Partial<Prefs>>(PREFS_KEY, {});
+  return { hour12: typeof p.hour12 === "boolean" ? p.hour12 : true };
+}
+function savePrefs(p: Prefs) {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+}
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -98,7 +155,7 @@ function persistLists(lists: WatchlistGroup[], activeId: string) {
 }
 
 // Single place that updates the lists, the active id, the `watchlist` mirror,
-// and persistence together — so no action can desync them.
+// and persistence together - so no action can desync them.
 function commitLists(
   set: (p: Partial<StoreState>) => void,
   lists: WatchlistGroup[],
@@ -131,8 +188,55 @@ export const useStore = create<StoreState>((set, get) => ({
   alerts: load<Alert[]>(ALERTS_KEY, []),
   selected: "NVDA",
   equityTrail: [],
+  ticket: null,
+  lastError: null,
+  hour12: loadPrefs().hour12,
+  chartTf: "1D",
+  periodStart: null,
+  update: { info: null, checking: false, applying: false, dismissed: false, error: null },
+
+  setHour12: (v) => {
+    set({ hour12: v });
+    savePrefs({ hour12: v });
+  },
+  setChartTf: (tf) => set({ chartTf: tf }),
+  setPeriodStart: (p) => set({ periodStart: p }),
+
+  checkUpdate: async (force = false) => {
+    if (get().update.checking) return;
+    set({ update: { ...get().update, checking: true, error: null } });
+    try {
+      const info = await api.version(force);
+      set({ update: { ...get().update, info, checking: false } });
+    } catch (e: any) {
+      set({ update: { ...get().update, checking: false, error: String(e?.message || e) } });
+    }
+  },
+
+  applyUpdate: async () => {
+    if (get().update.applying) return;
+    set({ update: { ...get().update, applying: true, error: null } });
+    try {
+      const r = await api.applyUpdate();
+      if (r.ok) {
+        // New code is in place; reload so the client picks up the new bundle.
+        setTimeout(() => location.reload(), 1200);
+      } else {
+        set({ update: { ...get().update, applying: false, error: r.message } });
+      }
+    } catch (e: any) {
+      set({ update: { ...get().update, applying: false, error: String(e?.message || e) } });
+    }
+  },
+
+  dismissUpdate: () => set({ update: { ...get().update, dismissed: true } }),
 
   init: async () => {
+    // Request notification permission up front so alerts restored from
+    // localStorage (or created outside AlertsPanel) can still notify.
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
     const health = await api.health().catch(() => ({ mode: "live" as const, ok: false, robinhood: false }));
     const status = await api.robinhood.status().catch(() => null);
     set({
@@ -155,6 +259,8 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     }
     connect(set, get);
+    // Check GitHub for a newer release on launch (and hourly, scheduled by the UI).
+    get().checkUpdate().catch(() => {});
   },
 
   connectRobinhood: async () => {
@@ -190,7 +296,15 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   disconnectRobinhood: async () => {
-    await api.robinhood.disconnect().catch(() => {});
+    try {
+      await api.robinhood.disconnect();
+    } catch (e) {
+      // Server-side disconnect failed - leave local state intact to avoid
+      // desyncing the client from a still-connected session.
+      console.error("Robinhood disconnect failed", e);
+      set({ lastError: "Failed to disconnect Robinhood" });
+      return;
+    }
     set({
       robinhood: { connected: false, hasSession: false, available: true },
       accounts: [],
@@ -221,6 +335,9 @@ export const useStore = create<StoreState>((set, get) => ({
         api.positions(account).catch(() => get().positions),
         api.orders(account).catch(() => get().orders),
       ]);
+      // Bail out if the active account changed while these fetches were in
+      // flight, so stale data can't overwrite the newly selected account.
+      if (get().account !== account) return;
       set({
         portfolio: portfolio ?? get().portfolio,
         positions: positions.length ? positions : get().positions,
@@ -239,6 +356,9 @@ export const useStore = create<StoreState>((set, get) => ({
       api.positions(account).catch(() => []),
       api.orders(account).catch(() => []),
     ]);
+    // Bail out if the user switched accounts while these fetches were in
+    // flight, so stale results can't overwrite the current account's data.
+    if (get().account !== account) return;
     set({ portfolio, positions, orders });
   },
 
@@ -246,6 +366,9 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ selected: symbol.toUpperCase() });
     subscribeAll(get);
   },
+
+  openTicket: (seed) => set({ ticket: { ...seed, symbol: seed.symbol.toUpperCase() } }),
+  closeTicket: () => set({ ticket: null }),
 
   addToWatchlist: (symbol) => {
     const s = symbol.toUpperCase();
@@ -331,6 +454,10 @@ export const useStore = create<StoreState>((set, get) => ({
       if (msg.connected && !prev.connected) get().refreshAccount();
       if (!msg.connected && prev.connected)
         set({ accounts: [], account: "", portfolio: null, positions: [], orders: [], equityTrail: [] });
+    } else if (msg.type === "error") {
+      // Surface server-side errors so the UI can show them, and keep the app stable.
+      console.error("Server error:", msg.message);
+      set({ lastError: msg.message });
     }
   },
 }));
@@ -367,13 +494,20 @@ function subscribeAll(get: () => StoreState) {
 }
 
 function checkAlerts(get: () => StoreState, set: any) {
-  const { alerts, quotes } = get();
+  const { alerts, quotes, prevPrice } = get();
   let changed = false;
   const next = alerts.map((a) => {
     if (a.triggered) return a;
     const q = quotes[a.symbol];
     if (!q) return a;
-    const hit = a.direction === "above" ? q.price >= a.price : q.price <= a.price;
+    const prev = prevPrice[a.symbol];
+    // Require a true crossing: no prior price yet means we can't tell whether
+    // the level was just crossed, so don't fire on the first tick.
+    if (prev === undefined) return a;
+    const hit =
+      a.direction === "above"
+        ? prev < a.price && q.price >= a.price
+        : prev > a.price && q.price <= a.price;
     if (hit) {
       changed = true;
       notify(`${a.symbol} ${a.direction} $${a.price.toFixed(2)}`, `Now $${q.price.toFixed(2)}`);

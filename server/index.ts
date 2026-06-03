@@ -9,6 +9,7 @@ import { createProvider, MockProvider, LiveProvider } from "./provider/index.js"
 import { fetchFundamentals } from "./provider/fundamentals.js";
 import { fetchNews } from "./provider/news.js";
 import { fetchScreener } from "./provider/screener.js";
+import { checkForUpdate, applyUpdate } from "./provider/updates.js";
 import type { WsClientMessage, WsMessage } from "../shared/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -20,16 +21,33 @@ const REDIRECT_URI = `${PUBLIC_URL}/api/robinhood/callback`;
 const provider = createProvider(REDIRECT_URI);
 const live = provider instanceof LiveProvider ? provider : null;
 
+// Last-resort safety net: a stray rejection in the tick loop or a route handler
+// must never take the whole server down. Log and keep serving.
+process.on("unhandledRejection", (reason: any) => {
+  console.error("[unhandledRejection]", reason?.message || reason);
+});
+process.on("uncaughtException", (err: any) => {
+  console.error("[uncaughtException]", err?.message || err);
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Map an error to an HTTP status: known client/validation/not-connected errors
+// (those carrying a numeric `.status`) get a 4xx; everything else is treated as a
+// genuine upstream failure (502). The JSON body shape ({error}) is unchanged.
+const statusForError = (err: any): number => {
+  const s = Number(err?.status);
+  return Number.isInteger(s) && s >= 400 && s < 500 ? s : 502;
+};
 
 const ok = <T>(res: express.Response, fn: () => Promise<T>) =>
   fn()
     .then((data) => res.json({ data }))
     .catch((err) => {
       console.error("[api]", err?.message || err);
-      res.status(502).json({ error: String(err?.message || err) });
+      res.status(statusForError(err)).json({ error: String(err?.message || err) });
     });
 
 app.get("/api/health", (_req, res) =>
@@ -44,6 +62,16 @@ app.get("/api/positions/:account", (req, res) =>
 );
 app.get("/api/orders/:account", (req, res) =>
   ok(res, () => provider.getOrders(req.params.account)),
+);
+// Order entry: review simulates, place commits real money, cancel cancels by id.
+app.post("/api/orders/:account/review", (req, res) =>
+  ok(res, () => provider.reviewOrder(req.params.account, req.body)),
+);
+app.post("/api/orders/:account/place", (req, res) =>
+  ok(res, () => provider.placeOrder(req.params.account, req.body)),
+);
+app.post("/api/orders/:account/cancel", (req, res) =>
+  ok(res, () => provider.cancelOrder(req.params.account, String(req.body?.orderId || ""))),
 );
 app.get("/api/quotes", (req, res) => {
   const symbols = String(req.query.symbols || "")
@@ -66,6 +94,12 @@ app.get("/api/news/:symbol", (req, res) => ok(res, () => fetchNews(req.params.sy
 app.get("/api/screener", (req, res) =>
   ok(res, () => fetchScreener(String(req.query.preset || "day_gainers"))),
 );
+
+// ── Self-update (checks / applies the latest from the GitHub repo) ──────────
+app.get("/api/version", (req, res) =>
+  ok(res, () => checkForUpdate(req.query.force === "1")),
+);
+app.post("/api/update", (_req, res) => ok(res, () => applyUpdate()));
 
 // ── Robinhood MCP connection (OAuth) ───────────────────────────────────────
 const rhUnavailable = { connected: false, connecting: false, hasSession: false, error: null, available: false };
@@ -145,7 +179,9 @@ wss.on("connection", async (ws) => {
     } catch {
       return;
     }
-    if (msg.type === "subscribe") msg.symbols.forEach((s) => client.symbols.add(s.toUpperCase()));
+    // The client sends its full symbol union on every subscribe, so REPLACE the
+    // set rather than union into it (which would grow unbounded over a session).
+    if (msg.type === "subscribe") client.symbols = new Set(msg.symbols.map((s) => s.toUpperCase()));
     else if (msg.type === "unsubscribe") msg.symbols.forEach((s) => client.symbols.delete(s.toUpperCase()));
     else if (msg.type === "setAccount") client.account = msg.account;
   });
@@ -172,7 +208,7 @@ async function broadcast() {
       const quotes = await provider.getQuotes([...allSymbols]);
       quoteMap = new Map(quotes.map((q) => [q.symbol, q]));
     } catch {
-      /* transient upstream error — skip quotes this tick */
+      /* transient upstream error - skip quotes this tick */
     }
   }
 
@@ -206,9 +242,28 @@ async function broadcast() {
   }
 }
 
-setInterval(() => {
-  broadcast().catch((e) => console.error("[ws] broadcast", e?.message || e));
-}, TICK_MS);
+// Self-scheduling loop with a re-entrancy guard: a slow tick can never overlap
+// with the next one. The next tick is scheduled in finally, so an error in the
+// body can't stall the loop.
+let broadcasting = false;
+function scheduleBroadcast() {
+  setTimeout(async () => {
+    if (broadcasting) {
+      scheduleBroadcast();
+      return;
+    }
+    broadcasting = true;
+    try {
+      await broadcast();
+    } catch (e: any) {
+      console.error("[ws] broadcast", e?.message || e);
+    } finally {
+      broadcasting = false;
+      scheduleBroadcast();
+    }
+  }, TICK_MS);
+}
+scheduleBroadcast();
 
 httpServer.listen(PORT, async () => {
   console.log(

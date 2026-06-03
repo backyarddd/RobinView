@@ -35,6 +35,8 @@ const GROUPS: ShortcutGroup[] = [
       { keys: ["M"], label: "Measure" },
       { keys: ["Esc"], label: "Cursor" },
       { keys: ["Del", "⌫"], label: "Delete selected" },
+      { keys: ["⌘", "Z"], label: "Undo drawing" },
+      { keys: ["⌘", "⇧", "Z"], label: "Redo drawing" },
     ],
   },
 ];

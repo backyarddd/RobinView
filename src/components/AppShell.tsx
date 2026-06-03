@@ -13,6 +13,10 @@ import {
 import { TopBar } from "./TopBar";
 import { CommandPalette } from "./CommandPalette";
 import { ShortcutsHelp } from "./ShortcutsHelp";
+import { SettingsModal } from "./SettingsModal";
+import { UpdateBanner } from "./UpdateBanner";
+import { APP_VERSION } from "../lib/version";
+import { TradeTicket } from "./trade/TradeTicket";
 import { TerminalView } from "./views/TerminalView";
 import { PortfolioView } from "./views/PortfolioView";
 import { MarketsView } from "./views/MarketsView";
@@ -35,13 +39,29 @@ export function AppShell() {
   const [view, setView] = useState<View>("terminal");
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
+  const [settings, setSettings] = useState(false);
   const init = useStore((s) => s.init);
   const alerts = useStore((s) => s.alerts);
+  const select = useStore((s) => s.select);
+  const checkUpdate = useStore((s) => s.checkUpdate);
+  const hasUpdate = useStore((s) => !!s.update.info?.hasUpdate);
   const activeAlerts = alerts.filter((a) => !a.triggered).length;
+
+  // Select a symbol and jump to the Terminal (the only view that hosts the chart).
+  const openSymbol = (s: string) => {
+    select(s);
+    setView("terminal");
+  };
 
   useEffect(() => {
     init();
   }, [init]);
+
+  // Re-check GitHub for a newer release once an hour (launch check runs in init()).
+  useEffect(() => {
+    const id = setInterval(() => checkUpdate(), 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [checkUpdate]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -96,25 +116,47 @@ export function AppShell() {
           );
         })}
         <div className="rail-spacer" />
-        <button className="rail-btn" title="Settings">
+        <button
+          className={`rail-btn ${settings ? "active" : ""}`}
+          title="Settings"
+          onClick={() => setSettings(true)}
+        >
           <IconGear size={20} />
-          <span className="rail-tip">Settings · ⌘K</span>
+          {hasUpdate && <span className="rail-update-dot" />}
+          <span className="rail-tip">Settings{hasUpdate ? " · update available" : ""}</span>
+        </button>
+        <button
+          className="rail-version mono"
+          title={hasUpdate ? "Update available - open Settings" : "RobinView version"}
+          onClick={() => setSettings(true)}
+        >
+          v{APP_VERSION}
+          {hasUpdate && <span className="rail-version-dot" />}
         </button>
       </nav>
 
       <TopBar onOpenSearch={() => setPalette(true)} />
 
       <main className="main">
-        {view === "terminal" && <TerminalView onOpenSearch={() => setPalette(true)} />}
-        {view === "portfolio" && <PortfolioView />}
-        {view === "markets" && <MarketsView />}
-        {view === "screener" && <ScreenerView />}
+        {/* Terminal stays mounted (just hidden) across tab switches: it owns
+            lightweight-charts instances whose teardown-on-unmount races the DOM
+            detach and throws "Object is disposed"; keeping it alive also preserves
+            chart state and makes returning to it instant. */}
+        <div style={{ display: view === "terminal" ? "contents" : "none" }}>
+          <TerminalView onOpenSearch={() => setPalette(true)} />
+        </div>
+        {view === "portfolio" && <PortfolioView onOpenSymbol={openSymbol} />}
+        {view === "markets" && <MarketsView onOpenSymbol={openSymbol} />}
+        {view === "screener" && <ScreenerView onOpenSymbol={openSymbol} />}
         {view === "orders" && <OrdersView />}
         {view === "alerts" && <AlertsView />}
       </main>
 
       <CommandPalette open={palette} onClose={() => setPalette(false)} onNavigate={setView} />
       <ShortcutsHelp open={shortcuts} onClose={() => setShortcuts(false)} />
+      <SettingsModal open={settings} onClose={() => setSettings(false)} />
+      <UpdateBanner />
+      <TradeTicket />
     </div>
   );
 }

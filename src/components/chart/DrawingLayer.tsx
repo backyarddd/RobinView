@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import type { IChartApi, ISeriesApi } from "lightweight-charts";
+import { useEffect, useRef, useState } from "react";
+import type { IChartApi, ISeriesApi, Time } from "lightweight-charts";
 
 export type DrawTool =
   | "cursor"
@@ -13,9 +13,15 @@ export type DrawTool =
   | "text"
   | "measure";
 
-// A point anchored in chart space: logical index (x, survives pan/zoom and
-// extends into whitespace) + price (y).
-interface Pt {
+// A point anchored in chart space: time (x, epoch seconds - stable across
+// timeframe changes and reloads, unlike a logical index) + price (y).
+export interface Pt {
+  t: number;
+  p: number;
+}
+// Legacy point format ({l,p}) persisted before the time-anchoring refactor.
+// Migrated to {t,p} on load (see migrateDrawings).
+export interface LegacyPt {
   l: number;
   p: number;
 }
@@ -24,6 +30,8 @@ export interface Drawing {
   tool: DrawTool;
   pts: Pt[];
   color: string;
+  width?: number; // stroke width in px (default 1.5)
+  dash?: boolean; // dashed stroke
   text?: string;
   name?: string; // custom label shown in the Objects panel
   hidden?: boolean;
@@ -37,6 +45,9 @@ export function DrawingLayer({
   series,
   tool,
   color,
+  width,
+  dash,
+  magnet,
   drawings,
   onChange,
   onCommit,
@@ -47,6 +58,9 @@ export function DrawingLayer({
   series: ISeriesApi<any>;
   tool: DrawTool;
   color: string;
+  width: number; // stroke width for new drawings (px)
+  dash: boolean; // dashed stroke for new drawings
+  magnet: boolean; // snap new/dragged points to nearest OHLC value
   drawings: Drawing[];
   onChange: (d: Drawing[]) => void;
   onCommit: () => void; // reset tool to cursor after a one-shot draw
@@ -81,7 +95,7 @@ export function DrawingLayer({
   useEffect(() => {
     const ts = chart.timeScale();
     const bump = () => force((n) => n + 1);
-    // During a pan/zoom this fires every frame — skip the re-render when there's
+    // During a pan/zoom this fires every frame - skip the re-render when there's
     // nothing drawn to re-project.
     const onRange = () => {
       if (hasContent.current) bump();
@@ -101,6 +115,20 @@ export function DrawingLayer({
     };
   }, [chart]);
 
+  // Empty-space click -> deselect. In cursor mode the SVG root is
+  // pointer-events:none so its own onClick never fires; instead we listen to the
+  // chart canvas. A click that lands on a drawing is consumed by that SVG shape
+  // (the topmost hit target), so the canvas only fires for genuine empty space.
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
+  useEffect(() => {
+    const handler = () => {
+      if (toolRef.current === "cursor") setSelectedId(null);
+    };
+    chart.subscribeClick(handler);
+    return () => chart.unsubscribeClick(handler);
+  }, [chart, setSelectedId]);
+
   // delete selected with keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -116,16 +144,48 @@ export function DrawingLayer({
   }, [selectedId, drawings, onChange, setSelectedId]);
 
   const ts = chart.timeScale();
-  const toX = (l: number) => ts.logicalToCoordinate(l as any);
+  const toX = (t: number) => ts.timeToCoordinate(t as Time);
   const toY = (p: number) => series.priceToCoordinate(p);
+
+  // Magnet snapping: given an x-coordinate and a raw price, snap the price to the
+  // nearest OHLC value of the bar under that coordinate. True OHLC snapping -
+  // lightweight-charts v4 exposes the loaded bar data via series.dataByIndex(),
+  // so no extra `candles` prop is needed. If the bar (or its OHLC) can't be
+  // resolved, the raw price is returned unchanged (never throws).
+  const snapPrice = (x: number, rawPrice: number): number => {
+    try {
+      const logical = ts.coordinateToLogical(x);
+      if (logical == null) return rawPrice;
+      const bar: any = series.dataByIndex(Math.round(logical as number));
+      if (!bar) return rawPrice;
+      const vals = [bar.open, bar.high, bar.low, bar.close].filter(
+        (v): v is number => typeof v === "number",
+      );
+      if (!vals.length) return rawPrice;
+      let best = vals[0];
+      let bestD = Math.abs(rawPrice - best);
+      for (const v of vals) {
+        const dd = Math.abs(rawPrice - v);
+        if (dd < bestD) {
+          best = v;
+          bestD = dd;
+        }
+      }
+      return best;
+    } catch {
+      return rawPrice;
+    }
+  };
+
   const fromXY = (clientX: number, clientY: number): Pt | null => {
     const r = svgRef.current!.getBoundingClientRect();
     const x = clientX - r.left;
     const y = clientY - r.top;
-    const l = ts.coordinateToLogical(x);
+    const t = ts.coordinateToTime(x);
     const p = series.coordinateToPrice(y);
-    if (l == null || p == null) return null;
-    return { l: l as number, p: p as number };
+    if (t == null || p == null) return null;
+    const price = magnet ? snapPrice(x, p as number) : (p as number);
+    return { t: t as number, p: price };
   };
 
   // ---- pointer interaction (only when a draw tool is active) ----
@@ -137,17 +197,17 @@ export function DrawingLayer({
 
     if (tool === "text") {
       const text = prompt("Note text:");
-      if (text) commit({ id: id(), tool, pts: [pt], color, text });
+      if (text) commit({ id: id(), tool, pts: [pt], color, width, dash, text });
       onCommit();
       return;
     }
     if (tool === "hline" || tool === "vline") {
-      commit({ id: id(), tool, pts: [pt], color });
+      commit({ id: id(), tool, pts: [pt], color, width, dash });
       onCommit();
       return;
     }
     drafting.current = true;
-    setDraft({ id: id(), tool, pts: tool === "brush" ? [pt] : [pt, pt], color });
+    setDraft({ id: id(), tool, pts: tool === "brush" ? [pt] : [pt, pt], color, width, dash });
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -162,7 +222,7 @@ export function DrawingLayer({
     if (!drafting.current || !draft) return;
     drafting.current = false;
     if (draft.tool === "measure") {
-      setMeasure(draft); // transient — not saved to the objects list
+      setMeasure(draft); // transient - not saved to the objects list
       setDraft(null);
       return; // keep the measure tool active for repeated measurements
     }
@@ -192,9 +252,9 @@ export function DrawingLayer({
       let pts: Pt[];
       if (kind === "point") pts = orig.map((p, i) => (i === index ? cur : p));
       else {
-        const dl = cur.l - start.l;
+        const dt = cur.t - start.t;
         const dp = cur.p - start.p;
-        pts = orig.map((p) => ({ l: p.l + dl, p: p.p + dp }));
+        pts = orig.map((p) => ({ t: p.t + dt, p: p.p + dp }));
       }
       setEdit({ ...d, pts });
     };
@@ -215,10 +275,15 @@ export function DrawingLayer({
 
   const renderDrawing = (d: Drawing, isDraft = false) => {
     const sel = d.id === selectedId && !isDraft;
-    const sw = sel ? 2.5 : 1.6;
+    // Per-drawing stroke width (default 1.5); selection bumps it for visibility.
+    const baseW = d.width ?? 1.5;
+    const sw = sel ? baseW + 1 : baseW;
+    // Per-drawing dash. Pattern scales slightly with width so it stays legible.
+    const dashArray = d.dash ? `${baseW * 4} ${baseW * 2.5}` : undefined;
     const common = {
       stroke: d.color,
       strokeWidth: sw,
+      strokeDasharray: dashArray,
       fill: "none",
       style: { cursor: tool === "cursor" ? "move" : "crosshair", pointerEvents: "stroke" as const },
       onPointerDown: (e: React.PointerEvent) => startEdit(e, d, "body"),
@@ -231,39 +296,52 @@ export function DrawingLayer({
     };
     const a = d.pts[0];
     const b = d.pts[1];
-    const ax = a ? toX(a.l) : null;
+    const ax = a ? toX(a.t) : null;
     const ay = a ? toY(a.p) : null;
 
     switch (d.tool) {
       case "hline":
         if (ay == null) return null;
-        return <line key={d.id} {...common} x1={0} y1={ay} x2={W} y2={ay} strokeDasharray={sel ? "" : "0"} />;
+        return <line key={d.id} {...common} x1={0} y1={ay} x2={W} y2={ay} />;
       case "vline":
         if (ax == null) return null;
         return <line key={d.id} {...common} x1={ax} y1={0} x2={ax} y2={H} />;
       case "trend": {
         if (!b) return null;
-        const bx = toX(b.l);
+        const bx = toX(b.t);
         const by = toY(b.p);
         if (ax == null || ay == null || bx == null || by == null) return null;
         return <line key={d.id} {...common} x1={ax} y1={ay} x2={bx} y2={by} />;
       }
       case "ray": {
         if (!b) return null;
-        const bx = toX(b.l);
+        const bx = toX(b.t);
         const by = toY(b.p);
         if (ax == null || ay == null || bx == null || by == null) return null;
-        // extend beyond b to the right edge
+        // Extend in the a->b direction to the chart edge, regardless of sign.
+        // Parametrize P(t) = a + t*(b-a); forward means t increasing past b (t>1).
+        // Intersect with x=0 and x=W and take the nearest forward edge hit.
         const dx = bx - ax;
         const dy = by - ay;
-        const t = dx !== 0 ? (W - ax) / dx : 1e6;
-        const ex = ax + dx * Math.max(t, 1);
-        const ey = ay + dy * Math.max(t, 1);
+        let t = 1;
+        if (dx !== 0) {
+          const t0 = (0 - ax) / dx;
+          const tW = (W - ax) / dx;
+          // pick the forward-going (t>0, in the b direction) edge intersection
+          const fwd = [t0, tW].filter((v) => v > 0);
+          t = fwd.length ? Math.max(...fwd) : 1;
+        } else {
+          // vertical ray: extend to whichever horizontal edge is forward
+          t = dy >= 0 ? (H - ay) / (dy || 1) : (0 - ay) / (dy || 1);
+        }
+        t = Math.max(t, 1); // never retract behind b
+        const ex = ax + dx * t;
+        const ey = ay + dy * t;
         return <line key={d.id} {...common} x1={ax} y1={ay} x2={ex} y2={ey} />;
       }
       case "rect": {
         if (!b) return null;
-        const bx = toX(b.l);
+        const bx = toX(b.t);
         const by = toY(b.p);
         if (ax == null || ay == null || bx == null || by == null) return null;
         return (
@@ -280,7 +358,7 @@ export function DrawingLayer({
       }
       case "fib": {
         if (!b) return null;
-        const bx = toX(b.l);
+        const bx = toX(b.t);
         const by = toY(b.p);
         if (ax == null || ay == null || bx == null || by == null) return null;
         const x1 = Math.min(ax, bx);
@@ -295,7 +373,7 @@ export function DrawingLayer({
               if (y == null) return null;
               return (
                 <g key={lv}>
-                  <line x1={x1} y1={y} x2={x2} y2={y} stroke={d.color} strokeWidth={1} strokeOpacity={0.7} />
+                  <line x1={x1} y1={y} x2={x2} y2={y} stroke={d.color} strokeWidth={baseW} strokeDasharray={dashArray} strokeOpacity={0.7} />
                   <text x={x2 + 4} y={y + 3} fill={d.color} fontSize={10} fontFamily="var(--font-mono)">
                     {lv.toFixed(3)} · {price.toFixed(2)}
                   </text>
@@ -306,7 +384,7 @@ export function DrawingLayer({
         );
       }
       case "brush": {
-        const pts = d.pts.map((pt) => `${toX(pt.l)},${toY(pt.p)}`).filter((s) => !s.includes("null"));
+        const pts = d.pts.map((pt) => `${toX(pt.t)},${toY(pt.p)}`).filter((s) => !s.includes("null"));
         if (pts.length < 2) return null;
         return <polyline key={d.id} {...common} points={pts.join(" ")} strokeLinejoin="round" strokeLinecap="round" />;
       }
@@ -337,8 +415,8 @@ export function DrawingLayer({
     if (tool !== "cursor" || d.id !== selectedId || d.tool === "brush") return null;
     let pts: { x: number | null; y: number | null; i: number }[] = [];
     if (d.tool === "hline") pts = [{ x: W / 2, y: toY(d.pts[0].p), i: 0 }];
-    else if (d.tool === "vline") pts = [{ x: toX(d.pts[0].l), y: H / 2, i: 0 }];
-    else pts = d.pts.map((p, i) => ({ x: toX(p.l), y: toY(p.p), i }));
+    else if (d.tool === "vline") pts = [{ x: toX(d.pts[0].t), y: H / 2, i: 0 }];
+    else pts = d.pts.map((p, i) => ({ x: toX(p.t), y: toY(p.p), i }));
     return pts.map((h) =>
       h.x == null || h.y == null ? null : (
         <circle
@@ -361,16 +439,20 @@ export function DrawingLayer({
     const a = measure.pts[0];
     const b = measure.pts[1];
     if (!a || !b) return null;
-    const ax = toX(a.l);
+    const ax = toX(a.t);
     const ay = toY(a.p);
-    const bx = toX(b.l);
+    const bx = toX(b.t);
     const by = toY(b.p);
     if (ax == null || ay == null || bx == null || by == null) return null;
     const up = b.p >= a.p;
     const c = up ? "#34e29b" : "#ff6a57";
     const dP = b.p - a.p;
     const pct = a.p ? (dP / a.p) * 100 : 0;
-    const bars = Math.round(b.l - a.l);
+    // Bar count is a logical-index distance; derive it from the projected pixels
+    // since points are now anchored by time, not logical index.
+    const la = ts.coordinateToLogical(ax);
+    const lb = ts.coordinateToLogical(bx);
+    const bars = la != null && lb != null ? Math.round((lb as number) - (la as number)) : 0;
     const boxW = 132;
     const boxH = 46;
     const bxX = Math.min(Math.max(bx + 10, 0), W - boxW);
@@ -423,4 +505,46 @@ export function DrawingLayer({
 
 function id() {
   return crypto.randomUUID();
+}
+
+// Drawings are anchored by time ({t,p}). Older saves used logical index ({l,p}),
+// which isn't stable across timeframe changes / reloads. Convert any legacy points
+// to time using the currently loaded candles (candles[l].time). A drawing whose
+// point can't be converted (index out of range for this candle set) is dropped
+// rather than rendered at the wrong place. Already-migrated drawings pass through
+// untouched, so this is safe to run repeatedly.
+export function migrateDrawings(
+  raw: unknown,
+  candles: { time: number }[],
+): { drawings: Drawing[]; changed: boolean } {
+  if (!Array.isArray(raw)) return { drawings: [], changed: false };
+  let changed = false;
+  const out: Drawing[] = [];
+  for (const d of raw as any[]) {
+    if (!d || !Array.isArray(d.pts)) {
+      changed = true;
+      continue;
+    }
+    const pts: Pt[] = [];
+    let ok = true;
+    for (const pt of d.pts as (Pt | LegacyPt)[]) {
+      if (pt && typeof (pt as Pt).t === "number") {
+        pts.push({ t: (pt as Pt).t, p: (pt as any).p });
+      } else if (pt && typeof (pt as LegacyPt).l === "number") {
+        const t = candles[(pt as LegacyPt).l]?.time;
+        if (t == null) {
+          ok = false;
+          break;
+        }
+        pts.push({ t, p: (pt as any).p });
+        changed = true;
+      } else {
+        ok = false;
+        break;
+      }
+    }
+    if (ok && pts.length) out.push({ ...d, pts });
+    else changed = true; // dropped an unconvertible drawing
+  }
+  return { drawings: out, changed };
 }

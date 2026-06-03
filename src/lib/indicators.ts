@@ -112,13 +112,24 @@ export function bollinger(values: number[], period = 20, mult = 2): BollingerRes
   return { upper, middle, lower };
 }
 
-// VWAP resets per session; with synthetic intraday we run it cumulatively.
+// VWAP, anchored per trading session (resets at each day boundary) like
+// TradingView. Candle times are UNIX seconds; a US regular/extended session
+// falls within a single UTC day, so the UTC day index is a sound session key.
+// On daily+ timeframes each bar is its own session, so VWAP degenerates to the
+// typical price - the mathematically correct session VWAP for that resolution.
 export function vwap(candles: Candle[]): number[] {
   const out = new Array(candles.length).fill(NA);
   let cumPV = 0;
   let cumV = 0;
+  let session = NaN;
   for (let i = 0; i < candles.length; i++) {
     const c = candles[i];
+    const day = Math.floor((c.time as number) / 86400);
+    if (day !== session) {
+      session = day;
+      cumPV = 0;
+      cumV = 0;
+    }
     const typical = (c.high + c.low + c.close) / 3;
     cumPV += typical * c.volume;
     cumV += c.volume;
@@ -278,7 +289,7 @@ function smaIgnoreNaN(values: number[], period: number): number[] {
   return out;
 }
 
-// Build {time,value} points dropping NaN — ready for lightweight-charts setData.
+// Build {time,value} points dropping NaN - ready for lightweight-charts setData.
 export function toLine(candles: Candle[], series: number[]): LinePoint[] {
   const pts: LinePoint[] = [];
   for (let i = 0; i < candles.length; i++) {
@@ -289,7 +300,7 @@ export function toLine(candles: Candle[], series: number[]): LinePoint[] {
 
 export const closes = (candles: Candle[]) => candles.map((c) => c.close);
 
-// Heikin Ashi candles — smoothed OHLC that filters noise / clarifies trend.
+// Heikin Ashi candles - smoothed OHLC that filters noise / clarifies trend.
 export function heikinAshi(candles: Candle[]): Candle[] {
   const out: Candle[] = [];
   let prevO = 0;

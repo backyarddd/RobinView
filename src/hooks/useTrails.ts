@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "../store/useStore";
 
 // Accumulates a rolling price history per symbol from the live quote stream,
@@ -21,15 +21,13 @@ export function useTrails(symbols: string[], cap = 40): Record<string, number[]>
 // Flash a row green/red briefly when a value ticks. Returns a className.
 export function useFlash(value: number): string {
   const prev = useRef(value);
-  const cls = useRef("");
-  if (value !== prev.current) {
-    cls.current = value > prev.current ? "flash-up" : "flash-down";
-    prev.current = value;
-  }
-  // re-trigger animation by keying on value handled by caller
+  const [cls, setCls] = useState("");
   useEffect(() => {
-    const t = setTimeout(() => (cls.current = ""), 650);
+    if (value === prev.current) return;
+    setCls(value > prev.current ? "flash-up" : "flash-down");
+    prev.current = value;
+    const t = setTimeout(() => setCls(""), 650);
     return () => clearTimeout(t);
   }, [value]);
-  return cls.current;
+  return cls;
 }

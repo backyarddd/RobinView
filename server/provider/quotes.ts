@@ -5,7 +5,7 @@ import { fetchWithTimeout, num, round2 } from "./util.js";
 // The spark endpoint returns intraday close series for many symbols in ONE call,
 // from which we derive live price, previous close, day open/high/low.
 
-const QUOTE_TTL = 1500; // ms — quotes are polled ~1/s; a tiny cache de-dupes bursts
+const QUOTE_TTL = 1500; // ms - quotes are polled ~1/s; a tiny cache de-dupes bursts
 const cache = new Map<string, { at: number; quote: Quote }>();
 const nameCache = new Map<string, string>();
 
@@ -67,26 +67,34 @@ function orderBy(order: string[], quotes: Quote[]): Quote[] {
 function sparkToQuote(e: any): Quote | null {
   const symbol = String(e.symbol || "").toUpperCase();
   if (!symbol) return null;
-  const closesRaw: number[] = (e.close ?? []).filter((x: any) => x != null);
+  // Yahoo interleaves null AND NaN gaps in the close series; NaN survives a
+  // `!= null` filter, so filter to finite numbers only.
+  const closesRaw: number[] = (e.close ?? []).filter((x: any) => Number.isFinite(x));
   const prevClose = num(e.previousClose ?? e.chartPreviousClose);
   if (closesRaw.length === 0 && !prevClose) return null;
   const price = closesRaw.length ? closesRaw[closesRaw.length - 1] : prevClose;
+  // Drop the quote entirely if we can't establish a finite price - a NaN/Infinity
+  // price would poison every downstream computation (valuation, weights, charts).
+  if (!Number.isFinite(price)) return null;
   const open = closesRaw.length ? closesRaw[0] : prevClose;
   const dayHigh = closesRaw.length ? Math.max(...closesRaw) : price;
   const dayLow = closesRaw.length ? Math.min(...closesRaw) : price;
-  const change = price - prevClose;
+  // Only treat prevClose as a baseline when it's a valid positive number;
+  // otherwise there's no meaningful change/changePct to report.
+  const havePrev = Number.isFinite(prevClose) && prevClose > 0;
+  const change = havePrev ? price - prevClose : 0;
   return {
     symbol,
     name: nameCache.get(symbol),
     price: round2(price),
-    previousClose: round2(prevClose),
+    previousClose: round2(havePrev ? prevClose : price),
     open: round2(open),
     dayHigh: round2(dayHigh),
     dayLow: round2(dayLow),
     bid: round2(price - price * 0.0002),
     ask: round2(price + price * 0.0002),
     change: round2(change),
-    changePct: prevClose ? round2((change / prevClose) * 100) : 0,
+    changePct: havePrev ? round2((change / prevClose) * 100) : 0,
     extendedHours: false,
     state: "active",
     updatedAt: Date.now(),

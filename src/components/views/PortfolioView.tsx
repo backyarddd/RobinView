@@ -5,7 +5,7 @@ import { ConnectCard } from "../ConnectRobinhood";
 import { Sparkline, ChangePill } from "../common/bits";
 import { money, signedMoney, percent, dirClass, compactMoney } from "../../lib/format";
 
-export function PortfolioView() {
+export function PortfolioView({ onOpenSymbol }: { onOpenSymbol?: (s: string) => void } = {}) {
   const pf = useStore((s) => s.portfolio);
   const ready = useStore((s) => s.mode === "demo" || s.robinhood.connected);
   const trail = useStore((s) => s.equityTrail);
@@ -84,13 +84,13 @@ export function PortfolioView() {
             </span>
           </div>
           <div className="panel-body">
-            <PositionsTable />
+            <PositionsTable onOpenSymbol={onOpenSymbol} />
           </div>
         </div>
 
         {/* ALLOCATION */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <AllocationDonut />
+          <AllocationDonut onOpenSymbol={onOpenSymbol} />
           <div className="panel">
             <div className="panel-head">
               <span className="panel-title">Account Breakdown</span>

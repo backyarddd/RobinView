@@ -26,8 +26,9 @@ const COLS: { key: SortKey; label: string }[] = [
 
 const POLL_MS = 15000;
 
-export function ScreenerView() {
+export function ScreenerView({ onOpenSymbol }: { onOpenSymbol?: (s: string) => void } = {}) {
   const select = useStore((s) => s.select);
+  const open = onOpenSymbol ?? select;
   const [preset, setPreset] = useState<Preset>("day_gainers");
   const [rows, setRows] = useState<ScreenerRow[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -64,10 +65,12 @@ export function ScreenerView() {
       if (key === "symbol") return a.symbol.localeCompare(b.symbol) * mult;
       const av = a[key];
       const bv = b[key];
-      const an = av == null || !Number.isFinite(av) ? -Infinity : av;
-      const bn = bv == null || !Number.isFinite(bv) ? -Infinity : bv;
-      if (an === bn) return 0;
-      return an < bn ? -mult : mult;
+      const aMissing = av == null || !Number.isFinite(av);
+      const bMissing = bv == null || !Number.isFinite(bv);
+      // Missing/non-finite values always sink to the end, regardless of direction.
+      if (aMissing || bMissing) return aMissing === bMissing ? 0 : aMissing ? 1 : -1;
+      if (av === bv) return 0;
+      return av < bv ? -mult : mult;
     });
   }, [rows, sort]);
 
@@ -146,7 +149,7 @@ export function ScreenerView() {
                         </tr>
                       ))
                     : sorted.map((r) => (
-                        <tr key={r.symbol} onClick={() => select(r.symbol)}>
+                        <tr key={r.symbol} onClick={() => open(r.symbol)}>
                           <td>
                             <div className="cell-sym">
                               <SymBadge symbol={r.symbol} />

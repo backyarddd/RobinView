@@ -1,16 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="rv-body" x1="6" y1="52" x2="52" y2="14" gradientUnits="userSpaceOnUse">
+    <linearGradient id="fv-fill" x1="32" y1="50" x2="32" y2="14" gradientUnits="userSpaceOnUse">
       <stop stop-color="#1E7A56"/><stop offset="1" stop-color="#34E29B"/>
     </linearGradient>
-    <linearGradient id="rv-breast" x1="40" y1="14" x2="58" y2="34" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F0C878"/><stop offset="1" stop-color="#D49A3E"/>
-    </linearGradient>
+    <clipPath id="fv-lens"><circle cx="32" cy="32" r="20.5"/></clipPath>
   </defs>
   <rect width="64" height="64" rx="15" fill="#0A0C0B"/>
-  <path d="M9 49 L20 43 L28 33 L37 36 L47 23 Q51 19 49 30 Q47 41 38 47 L31 50 Q20 54 9 49 Z" fill="url(#rv-body)"/>
-  <path d="M20 43 L28 35 L37 38 L46 27" stroke="#0A0C0B" stroke-opacity="0.45" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="48" cy="21" r="8.4" fill="url(#rv-breast)"/>
-  <circle cx="50.4" cy="19.6" r="1.6" fill="#0A0C0B"/>
-  <path d="M55.5 21 L61 19.6 L56 24 Z" fill="#D49A3E"/>
+  <circle cx="32" cy="32" r="25" fill="#0f1311" stroke="#E3B766" stroke-width="2.4"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#E3B766" stroke-opacity="0.16" stroke-width="6"/>
+  <g clip-path="url(#fv-lens)">
+    <path d="M11.6 46.5 L20.8 39.8 L27.5 43.1 L36 30.6 L44.5 35 L53.8 18 L53.8 53 L11.6 53 Z" fill="url(#fv-fill)" fill-opacity="0.26"/>
+    <path d="M11.6 46.5 L20.8 39.8 L27.5 43.1 L36 30.6 L44.5 35 L53.8 18" stroke="#34E29B" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <circle cx="44.5" cy="35" r="2.3" fill="#0f1311" stroke="#34E29B" stroke-width="1.5"/>
+  <circle cx="44.5" cy="21.2" r="3" fill="#E3B766"/>
 </svg>

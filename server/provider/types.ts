@@ -7,6 +7,9 @@ import type {
   OrderRow,
   SearchResult,
   Timeframe,
+  OrderRequest,
+  OrderReview,
+  OrderResult,
 } from "../../shared/types.js";
 
 // A DataProvider is the seam between RobinView and a data source.
@@ -23,4 +26,9 @@ export interface DataProvider {
   getCandles(symbol: string, timeframe: Timeframe): Promise<CandleSeries>;
   getOrders(account: string): Promise<OrderRow[]>;
   search(query: string): Promise<SearchResult[]>;
+  // Order entry. reviewOrder simulates (pre-trade alerts + estimate); placeOrder
+  // commits real money; cancelOrder cancels an open order by id.
+  reviewOrder(account: string, req: OrderRequest): Promise<OrderReview>;
+  placeOrder(account: string, req: OrderRequest): Promise<OrderResult>;
+  cancelOrder(account: string, orderId: string): Promise<OrderResult>;
 }

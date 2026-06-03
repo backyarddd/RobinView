@@ -46,7 +46,7 @@ export function ConnectCard({ context = "portfolio" }: { context?: string }) {
             Connect your Robinhood account
           </div>
           <p style={{ color: "var(--text-3)", fontSize: 13, lineHeight: 1.55, margin: 0 }}>
-            RobinView authorizes directly with Robinhood to read your real {context} — positions,
+            RobinView authorizes directly with Robinhood to read your real {context} - positions,
             balances and order history. Charts and market data work without connecting.
           </p>
         </div>

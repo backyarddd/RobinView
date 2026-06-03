@@ -60,7 +60,7 @@ export function AlertsPanel() {
         {alerts.length === 0 && (
           <div className="empty">
             <IconBell size={22} />
-            <span>No price alerts. Set one above — you'll be notified when price crosses.</span>
+            <span>No price alerts. Set one above - you'll be notified when price crosses.</span>
           </div>
         )}
         {alerts.map((a) => {

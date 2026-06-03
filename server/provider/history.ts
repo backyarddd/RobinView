@@ -16,7 +16,7 @@ const RANGE: Record<Timeframe, { range: string; interval: string }> = {
   ALL: { range: "max", interval: "1mo" },
 };
 
-// Intraday views update often; long views barely change — cache accordingly.
+// Intraday views update often; long views barely change - cache accordingly.
 const TTL: Record<Timeframe, number> = {
   "1D": 20_000,
   "1W": 60_000,
@@ -59,7 +59,7 @@ export async function fetchHistory(symbol: string, tf: Timeframe): Promise<Candl
 
     const candles: Candle[] = [];
     for (let i = 0; i < ts.length; i++) {
-      // Yahoo emits nulls for gaps/halts — carry the last close so the series stays continuous.
+      // Yahoo emits nulls for gaps/halts - carry the last close so the series stays continuous.
       const close = c[i];
       if (close == null) continue;
       const open = o[i] ?? close;

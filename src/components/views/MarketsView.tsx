@@ -14,9 +14,11 @@ function heatColor(pct: number): string {
   return t >= 0 ? `rgba(52,226,155,${a.toFixed(3)})` : `rgba(255,106,87,${a.toFixed(3)})`;
 }
 
-export function MarketsView() {
+export function MarketsView({ onOpenSymbol }: { onOpenSymbol?: (s: string) => void } = {}) {
   const select = useStore((s) => s.select);
+  const open = onOpenSymbol ?? select;
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
+  const [failures, setFailures] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -28,8 +30,11 @@ export function MarketsView() {
           const map: Record<string, Quote> = {};
           for (const q of qs) map[q.symbol] = q;
           setQuotes(map);
+          setFailures(0);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (alive) setFailures((n) => n + 1);
+        });
     tick();
     const id = setInterval(tick, 2000);
     return () => {
@@ -39,6 +44,8 @@ export function MarketsView() {
   }, []);
 
   const list = MARKET_SYMBOLS.map((s) => quotes[s]).filter(Boolean) as Quote[];
+  // Surface an error state instead of skeletons forever if quotes keep failing.
+  const errored = list.length === 0 && failures >= 3;
   const gainers = [...list].sort((a, b) => b.changePct - a.changePct).slice(0, 8);
   const losers = [...list].sort((a, b) => a.changePct - b.changePct).slice(0, 8);
   // Spark quotes carry no volume, so rank "most active" by absolute move.
@@ -69,7 +76,7 @@ export function MarketsView() {
                 key={q.symbol}
                 className="heat-cell"
                 style={{ background: heatColor(q.changePct) }}
-                onClick={() => select(q.symbol)}
+                onClick={() => open(q.symbol)}
               >
                 <div className="hs">{q.symbol}</div>
                 <div>
@@ -80,17 +87,22 @@ export function MarketsView() {
                 </div>
               </div>
             ))}
-            {list.length === 0 &&
+            {list.length === 0 && !errored &&
               Array.from({ length: 18 }).map((_, i) => (
                 <div key={i} className="skel" style={{ height: 74, borderRadius: 6 }} />
               ))}
+            {errored && (
+              <div className="empty" style={{ gridColumn: "1 / -1" }}>
+                Market data unavailable - retrying…
+              </div>
+            )}
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-          <MoverList title="Top Gainers" rows={gainers} onPick={select} />
-          <MoverList title="Top Losers" rows={losers} onPick={select} />
-          <MoverList title="Most Active" rows={active} onPick={select} />
+          <MoverList title="Top Gainers" rows={gainers} onPick={open} />
+          <MoverList title="Top Losers" rows={losers} onPick={open} />
+          <MoverList title="Most Active" rows={active} onPick={open} />
         </div>
       </div>
     </div>

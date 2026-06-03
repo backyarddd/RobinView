@@ -20,9 +20,11 @@ const COLS: { key: Key; label: string }[] = [
   { key: "portfolioWeight", label: "Weight" },
 ];
 
-export function PositionsTable() {
+export function PositionsTable({ onOpenSymbol }: { onOpenSymbol?: (s: string) => void } = {}) {
   const positions = useStore((s) => s.positions);
   const select = useStore((s) => s.select);
+  const open = onOpenSymbol ?? select;
+  const openTicket = useStore((s) => s.openTicket);
   const [sort, setSort] = useState<{ key: Key; dir: 1 | -1 }>({ key: "marketValue", dir: -1 });
 
   const rows = useMemo(() => {
@@ -60,11 +62,12 @@ export function PositionsTable() {
               {sort.key === c.key ? (sort.dir === -1 ? " ↓" : " ↑") : ""}
             </th>
           ))}
+          <th style={{ textAlign: "right" }}>Trade</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((p) => (
-          <tr key={p.symbol} onClick={() => select(p.symbol)}>
+          <tr key={p.symbol} onClick={() => open(p.symbol)}>
             <td>
               <div className="cell-sym">
                 <SymBadge symbol={p.symbol} />
@@ -96,6 +99,23 @@ export function PositionsTable() {
                   <div style={{ width: `${Math.min(100, p.portfolioWeight * 100)}%`, height: "100%", background: "var(--brass)" }} />
                 </div>
                 <span className="muted">{(p.portfolioWeight * 100).toFixed(1)}%</span>
+              </div>
+            </td>
+            <td onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
+                <button className="btn sm" style={{ color: "var(--up)" }} onClick={() => openTicket({ symbol: p.symbol, side: "buy" })}>
+                  Buy
+                </button>
+                <button className="btn sm" style={{ color: "var(--down)" }} onClick={() => openTicket({ symbol: p.symbol, side: "sell" })}>
+                  Sell
+                </button>
+                <button
+                  className="btn sm ghost"
+                  title={`Sell all ${shares(p.quantity)} shares`}
+                  onClick={() => openTicket({ symbol: p.symbol, side: "sell", qty: p.quantity })}
+                >
+                  Close
+                </button>
               </div>
             </td>
           </tr>

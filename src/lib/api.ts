@@ -11,11 +11,16 @@ import type {
   Fundamentals,
   NewsItem,
   ScreenerRow,
+  OrderRequest,
+  OrderReview,
+  OrderResult,
+  UpdateInfo,
+  UpdateResult,
 } from "@shared/types";
 
 // Re-export the shared market-data contracts so existing `from "../lib/api"`
 // imports keep working from one source of truth in shared/types.ts.
-export type { Fundamentals, NewsItem, ScreenerRow } from "@shared/types";
+export type { Fundamentals, NewsItem, ScreenerRow, OrderRequest, OrderReview, OrderResult, UpdateInfo, UpdateResult } from "@shared/types";
 export type RhStatus = RobinhoodStatus;
 
 async function get<T>(url: string): Promise<T> {
@@ -26,8 +31,12 @@ async function get<T>(url: string): Promise<T> {
   return body.data as T;
 }
 
-async function post<T>(url: string): Promise<T> {
-  const res = await fetch(url, { method: "POST" });
+async function post<T>(url: string, payload?: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: payload !== undefined ? { "Content-Type": "application/json" } : undefined,
+    body: payload !== undefined ? JSON.stringify(payload) : undefined,
+  });
   const body = await res.json();
   if (body.error) throw new Error(body.error);
   return body.data as T;
@@ -45,6 +54,12 @@ export const api = {
   portfolio: (account: string) => get<Portfolio>(`/api/portfolio/${account}`),
   positions: (account: string) => get<Position[]>(`/api/positions/${account}`),
   orders: (account: string) => get<OrderRow[]>(`/api/orders/${account}`),
+  reviewOrder: (account: string, req: OrderRequest) =>
+    post<OrderReview>(`/api/orders/${account}/review`, req),
+  placeOrder: (account: string, req: OrderRequest) =>
+    post<OrderResult>(`/api/orders/${account}/place`, req),
+  cancelOrder: (account: string, orderId: string) =>
+    post<OrderResult>(`/api/orders/${account}/cancel`, { orderId }),
   quotes: (symbols: string[]) =>
     get<Quote[]>(`/api/quotes?symbols=${encodeURIComponent(symbols.join(","))}`),
   candles: (symbol: string, tf: Timeframe) =>
@@ -53,4 +68,6 @@ export const api = {
   fundamentals: (symbol: string) => get<Fundamentals>(`/api/fundamentals/${symbol}`),
   news: (symbol: string) => get<NewsItem[]>(`/api/news/${symbol}`),
   screener: (preset = "day_gainers") => get<ScreenerRow[]>(`/api/screener?preset=${encodeURIComponent(preset)}`),
+  version: (force = false) => get<UpdateInfo>(`/api/version${force ? "?force=1" : ""}`),
+  applyUpdate: () => post<UpdateResult>("/api/update"),
 };

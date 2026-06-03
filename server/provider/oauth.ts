@@ -6,7 +6,7 @@ import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.
 
 // Persists the MCP OAuth session (dynamic client registration, PKCE verifier,
 // tokens) to a single file so a Robinhood connection survives server restarts.
-// RobinView registers itself as its own OAuth client — it does not reuse any
+// RobinView registers itself as its own OAuth client - it does not reuse any
 // other app's credentials.
 interface Store {
   clientInformation?: any;
