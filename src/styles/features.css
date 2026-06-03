@@ -69,6 +69,329 @@
   color: var(--text-1);
 }
 
+/* ----  Sectioned symbol info  ---- */
+.si-body {
+  overflow: auto;
+}
+.si-hero {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.si-hero-text {
+  min-width: 0;
+}
+.si-hero-name {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.si-hero-sub {
+  font-size: 11px;
+  margin-top: 2px;
+}
+.si-sec {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-faint);
+}
+.si-sec:last-child {
+  border-bottom: none;
+}
+.si-sec-title {
+  margin-bottom: 8px;
+}
+.si-sec-empty {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 2px 0 4px;
+}
+.si-link {
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+/* Range bars */
+.si-ranges {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.si-range-lbl {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-bottom: 5px;
+}
+.si-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.si-range-end {
+  flex-shrink: 0;
+}
+.si-range-track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--down-dim, #5a3a36), var(--surface-3), var(--up-dim, #2c6b52));
+}
+.si-range-marker {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-1);
+  border: 2px solid var(--bg-base);
+  transform: translate(-50%, -50%);
+}
+/* Performance grid */
+.si-perf {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.si-perf-cell {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 6px 4px;
+  text-align: center;
+}
+.si-perf-lbl {
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.si-perf-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+/* Technicals */
+.si-tech-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.si-tech-verdict {
+  font-weight: 700;
+  font-size: 13px;
+}
+.si-tech-counts {
+  font-size: 10.5px;
+}
+/* Analysts */
+.si-an-rating {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.si-an-key {
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--up);
+}
+.si-an-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+  background: var(--surface-3);
+}
+.si-an-bar span {
+  display: block;
+  height: 100%;
+}
+.si-an-legend {
+  font-size: 10.5px;
+  margin-top: 5px;
+}
+/* Earnings */
+.si-eps {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.si-eps-row {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 11.5px;
+}
+.si-eps-q {
+  color: var(--text-2);
+  font-weight: 600;
+}
+/* Financials table */
+.si-fin {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+.si-fin th {
+  text-align: right;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  font-weight: 600;
+  padding: 0 0 5px;
+}
+.si-fin th:first-child,
+.si-fin td:first-child {
+  text-align: left;
+}
+.si-fin td {
+  text-align: right;
+  padding: 3px 0;
+  color: var(--text-2);
+  border-top: 1px solid var(--line-faint);
+}
+/* Seasonals */
+.si-seasonals {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+  height: 64px;
+  align-items: end;
+}
+.si-sea-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+.si-sea-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.si-sea-bar {
+  width: 70%;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+}
+.si-sea-bar.up {
+  background: var(--up);
+}
+.si-sea-bar.down {
+  background: var(--down);
+}
+.si-sea-lbl {
+  font-size: 8.5px;
+  color: var(--text-4);
+  margin-top: 3px;
+}
+/* Inline news */
+.si-news {
+  display: flex;
+  flex-direction: column;
+}
+.si-news-row {
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line-faint);
+  cursor: pointer;
+}
+.si-news-row:last-child {
+  border-bottom: none;
+}
+.si-news-title {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-1);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.si-news-row:hover .si-news-title {
+  color: var(--accent);
+}
+.si-news-meta {
+  font-size: 10px;
+  margin-top: 3px;
+}
+/* Notes */
+.si-notes {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-1);
+  font-family: var(--font-ui);
+}
+.si-notes:focus {
+  outline: none;
+  border-color: var(--line-strong);
+}
+/* Section chooser menu */
+.si-menu {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  z-index: 20;
+  width: 200px;
+  max-height: 380px;
+  overflow: auto;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  padding: 6px;
+}
+.si-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 6px;
+}
+.si-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 6px;
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+.si-menu-item:hover {
+  background: var(--surface-2);
+}
+.si-menu-item input {
+  accent-color: var(--accent);
+}
+
 /* ====================  NEWS PANEL  ==================== */
 .news-row {
   display: flex;

@@ -4,6 +4,29 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0]
+
+### Added
+
+- **Company logos** in place of ticker placeholders, everywhere a symbol appears (watchlist,
+  positions, screener, markets, search, and the chart/info headers). Resolved by ticker -> domain
+  (static map plus Yahoo profile) and served via a logo endpoint that falls back from full logo to
+  favicon to a letter badge, so it always renders.
+- **Rich, sectioned Symbol Info panel** with a show/hide menu (like TradingView's section toggles):
+  Profile, Key stats, Pricing model, Bid & Ask, Price ranges, Performance, Technicals, Analysts,
+  Earnings, Dividends, Financials, Seasonals, Options, Latest news, and Notes. All real keyless
+  data (Yahoo quoteSummary, the options endpoint, and locally computed performance / seasonality /
+  technical summary). Bonds is omitted (no free source for single-name equities). Section choices
+  persist locally; private per-symbol notes are saved on the device.
+
+### Changed
+
+- **Layout.** The standalone top bar was removed and merged into the chart bubble (symbol, price,
+  timeframe-aware change, search, market clock, account switcher and connection controls now live
+  in the chart header). Watchlists moved into the bottom panel alongside Positions / Orders /
+  Alerts. The rich Symbol Info panel now occupies the right column. The bottom and right panels are
+  larger, using the space freed by removing the top bar.
+
 ## [0.2.2]
 
 ### Changed

@@ -16,11 +16,13 @@ import type {
   OrderResult,
   UpdateInfo,
   UpdateResult,
+  SymbolDetail,
+  OptionsSummary,
 } from "@shared/types";
 
 // Re-export the shared market-data contracts so existing `from "../lib/api"`
 // imports keep working from one source of truth in shared/types.ts.
-export type { Fundamentals, NewsItem, ScreenerRow, OrderRequest, OrderReview, OrderResult, UpdateInfo, UpdateResult } from "@shared/types";
+export type { Fundamentals, NewsItem, ScreenerRow, OrderRequest, OrderReview, OrderResult, UpdateInfo, UpdateResult, SymbolDetail, OptionsSummary } from "@shared/types";
 export type RhStatus = RobinhoodStatus;
 
 async function get<T>(url: string): Promise<T> {
@@ -70,4 +72,10 @@ export const api = {
   screener: (preset = "day_gainers") => get<ScreenerRow[]>(`/api/screener?preset=${encodeURIComponent(preset)}`),
   version: (force = false) => get<UpdateInfo>(`/api/version${force ? "?force=1" : ""}`),
   applyUpdate: () => post<UpdateResult>("/api/update"),
+  symbolDetail: (symbol: string) => get<SymbolDetail>(`/api/symbol/${encodeURIComponent(symbol)}`),
+  options: (symbol: string) => get<OptionsSummary>(`/api/options/${encodeURIComponent(symbol)}`),
+  // Logo image URL (the endpoint 302s to the real logo); `fav` requests the
+  // favicon fallback used when the primary logo image fails to load.
+  logoUrl: (symbol: string, fav = false) =>
+    `/api/logo/${encodeURIComponent(symbol)}${fav ? "?fallback=fav" : ""}`,
 };

@@ -56,8 +56,9 @@ another app's credentials or copies data out of anything else.
 - Live heatmap colored by daily move · Top Gainers / Losers / Most Active
 
 **Research**
+- **Sectioned Symbol Info panel** with a show/hide menu: Profile, Key stats, Pricing model, Bid & Ask, Price ranges, Performance, Technicals, Analysts, Earnings, Dividends, Financials, Seasonals, Options, Latest news and private Notes, all on real keyless data
 - Per-symbol **news** with headlines, publisher, timestamp, thumbnail, article summary and a link out to the full story
-- Symbol **fundamentals**: market cap, P/E, EPS, dividend yield, beta, 52-week range, next earnings
+- **Company logos** in place of ticker placeholders across the watchlist, tables and headers
 
 **Workflow**
 - ⌘K command palette - fuzzy symbol & company search + navigation

@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useStore } from "../../store/useStore";
 import { useTrails } from "../../hooks/useTrails";
 import { Sparkline, ChangePill } from "../common/bits";
+import { CompanyLogo } from "../common/CompanyLogo";
 import { IconTrash, IconPlus } from "../common/icons";
 import { price as fmtPrice } from "../../lib/format";
 
-export function Watchlist({ onAdd }: { onAdd: () => void }) {
+export function Watchlist({ onAdd, flush = false }: { onAdd: () => void; flush?: boolean }) {
   const watchlist = useStore((s) => s.watchlist);
   const watchlists = useStore((s) => s.watchlists);
   const activeListId = useStore((s) => s.activeListId);
@@ -23,7 +24,7 @@ export function Watchlist({ onAdd }: { onAdd: () => void }) {
   const active = watchlists.find((l) => l.id === activeListId);
 
   return (
-    <div className="panel" style={{ flex: 1, minHeight: 0 }}>
+    <div className={flush ? "wl-flush" : "panel"} style={flush ? undefined : { flex: 1, minHeight: 0 }}>
       <div className="panel-head">
         <div style={{ position: "relative" }}>
           <button className="wl-switch" onClick={() => setMenu((m) => !m)} title="Switch watchlist">
@@ -103,9 +104,12 @@ export function Watchlist({ onAdd }: { onAdd: () => void }) {
               className={`wl-row ${selected === sym ? "sel" : ""}`}
               onClick={() => select(sym)}
             >
-              <div style={{ minWidth: 0 }}>
-                <div className="wl-sym">{sym}</div>
-                <div className="wl-name">{q?.name ?? ""}</div>
+              <div className="wl-left">
+                <CompanyLogo symbol={sym} size={26} radius={7} />
+                <div style={{ minWidth: 0 }}>
+                  <div className="wl-sym">{sym}</div>
+                  <div className="wl-name">{q?.name ?? ""}</div>
+                </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div className="wl-spark">

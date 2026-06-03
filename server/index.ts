@@ -10,6 +10,9 @@ import { fetchFundamentals } from "./provider/fundamentals.js";
 import { fetchNews } from "./provider/news.js";
 import { fetchScreener } from "./provider/screener.js";
 import { checkForUpdate, applyUpdate } from "./provider/updates.js";
+import { fetchSymbolDetail } from "./provider/detail.js";
+import { fetchOptions } from "./provider/options.js";
+import { resolveDomain } from "./provider/logo.js";
 import type { WsClientMessage, WsMessage } from "../shared/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -91,9 +94,27 @@ app.get("/api/fundamentals/:symbol", (req, res) =>
   ok(res, () => fetchFundamentals(req.params.symbol)),
 );
 app.get("/api/news/:symbol", (req, res) => ok(res, () => fetchNews(req.params.symbol)));
+app.get("/api/symbol/:symbol", (req, res) => ok(res, () => fetchSymbolDetail(req.params.symbol)));
+app.get("/api/options/:symbol", (req, res) => ok(res, () => fetchOptions(req.params.symbol)));
 app.get("/api/screener", (req, res) =>
   ok(res, () => fetchScreener(String(req.query.preset || "day_gainers"))),
 );
+
+// Company logo: resolve the ticker to a domain, then 302 to a logo service.
+// `?fallback=fav` switches from Clearbit (full logo) to a Google favicon, which
+// the client uses as a second attempt before falling back to a letter badge.
+app.get("/api/logo/:symbol", (req, res) => {
+  resolveDomain(req.params.symbol)
+    .then((domain) => {
+      if (!domain) return res.status(404).end();
+      const url =
+        req.query.fallback === "fav"
+          ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+          : `https://logo.clearbit.com/${domain}`;
+      res.redirect(302, url);
+    })
+    .catch(() => res.status(404).end());
+});
 
 // ── Self-update (checks / applies the latest from the GitHub repo) ──────────
 app.get("/api/version", (req, res) =>

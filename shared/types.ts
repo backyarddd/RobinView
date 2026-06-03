@@ -211,6 +211,87 @@ export interface UpdateResult {
   output?: string; // tail of the git/npm output, for diagnostics
 }
 
+// ── Rich symbol detail (Yahoo quoteSummary, keyless) ──
+export interface EarningsPoint {
+  label: string; // e.g. "Q3 '25"
+  date?: number; // epoch ms
+  actual?: number; // reported EPS
+  estimate?: number; // consensus EPS estimate
+}
+export interface AnalystTrend {
+  strongBuy: number;
+  buy: number;
+  hold: number;
+  sell: number;
+  strongSell: number;
+}
+export interface FinancialRow {
+  year: string; // fiscal year label
+  revenue?: number;
+  grossProfit?: number;
+  netIncome?: number;
+}
+export interface SymbolDetail {
+  symbol: string;
+  // Profile
+  longName?: string;
+  sector?: string;
+  industry?: string;
+  description?: string;
+  website?: string;
+  country?: string;
+  employees?: number;
+  exchange?: string;
+  // Key stats / pricing model (valuation)
+  marketCap?: number;
+  peRatio?: number;
+  forwardPe?: number;
+  pegRatio?: number;
+  priceToSales?: number;
+  priceToBook?: number;
+  eps?: number;
+  beta?: number;
+  sharesOutstanding?: number;
+  avgVolume?: number;
+  week52High?: number;
+  week52Low?: number;
+  dayHigh?: number;
+  dayLow?: number;
+  // Dividends
+  dividendYield?: number; // percent (e.g. 0.52 = 0.52%)
+  dividendRate?: number; // annual $ per share
+  exDividendDate?: number; // epoch ms
+  payoutRatio?: number; // percent
+  // Earnings
+  nextEarningsDate?: number; // epoch ms
+  earnings?: EarningsPoint[]; // recent quarters, oldest -> newest
+  // Analysts
+  recommendationKey?: string; // e.g. "buy"
+  recommendationMean?: number; // 1 (strong buy) .. 5 (strong sell)
+  numberOfAnalysts?: number;
+  targetLow?: number;
+  targetMean?: number;
+  targetHigh?: number;
+  analystTrend?: AnalystTrend;
+  // Financials (annual, newest -> oldest)
+  financials?: FinancialRow[];
+}
+
+// ── Options chain summary (Yahoo /v7/finance/options, keyless) ──
+export interface OptionsSummary {
+  symbol: string;
+  hasOptions: boolean;
+  underlyingPrice?: number;
+  expiration?: number; // nearest expiry shown, epoch ms
+  expirations?: number[]; // all available expiries, epoch ms
+  callCount?: number;
+  putCount?: number;
+  putCallRatio?: number; // by open interest
+  atmStrike?: number;
+  atmCallIV?: number; // percent
+  atmPutIV?: number; // percent
+}
+
 export interface ScreenerRow {
   symbol: string;
   name: string;

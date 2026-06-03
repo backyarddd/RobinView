@@ -1,4 +1,5 @@
 import { percent, dirClass } from "../../lib/format";
+import { CompanyLogo } from "./CompanyLogo";
 
 // Tiny SVG sparkline.
 export function Sparkline({
@@ -51,5 +52,5 @@ export function ChangePill({ pct, className = "" }: { pct: number; className?: s
 }
 
 export function SymBadge({ symbol }: { symbol: string }) {
-  return <div className="sym-badge">{symbol.slice(0, 4)}</div>;
+  return <CompanyLogo symbol={symbol} size={30} radius={8} />;
 }

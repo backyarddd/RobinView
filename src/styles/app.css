@@ -4,8 +4,8 @@
   z-index: 1;
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: var(--topbar-h) 1fr;
-  grid-template-areas: "rail top" "rail main";
+  grid-template-rows: 1fr;
+  grid-template-areas: "rail main";
   height: 100vh;
   width: 100vw;
 }
@@ -428,8 +428,8 @@
 /* ====================  TERMINAL VIEW  ==================== */
 .terminal {
   display: grid;
-  grid-template-columns: 1fr 326px;
-  grid-template-rows: 1fr 230px;
+  grid-template-columns: 1fr 372px;
+  grid-template-rows: 1fr 288px;
   grid-template-areas: "chart side" "bottom side";
   gap: 12px;
   padding: 12px;
@@ -447,6 +447,36 @@
 }
 .t-bottom {
   grid-area: bottom;
+}
+
+/* ----  Merged chart header (replaces the old top bar)  ---- */
+.chart-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.chart-head-ticker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.chart-head-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.searchbtn.sm {
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  gap: 7px;
+  font-size: 12px;
 }
 
 /* ----  Chart panel  ---- */
@@ -1039,6 +1069,18 @@
 .wl-menu-new:hover {
   color: var(--up);
 }
+.wl-flush {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.wl-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
 .wl-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -1164,6 +1206,13 @@
   color: var(--text-2);
   flex-shrink: 0;
   letter-spacing: -0.03em;
+}
+.sym-logo {
+  flex-shrink: 0;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 2px;
 }
 .cell-sym .nm {
   display: flex;

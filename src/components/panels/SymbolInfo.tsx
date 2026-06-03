@@ -1,128 +1,128 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import type { Fundamentals } from "../../lib/api";
-import { compactMoney, compactNum, percent, fmtDate, price as fmtPrice } from "../../lib/format";
+import type { SymbolDetail, OptionsSummary, Candle } from "@shared/types";
+import { useStore } from "../../store/useStore";
+import { CompanyLogo } from "../common/CompanyLogo";
+import { IconGear, IconX } from "../common/icons";
+import { SECTIONS, SectionBody, Section, type SectionCtx } from "./SymbolSections";
 
-type Row = { k: string; v: string };
+const VIS_KEY = "robinview.infoSections";
 
-function buildRows(f: Fundamentals): Row[] {
-  const rows: Row[] = [];
-  const push = (k: string, val: number | undefined, fmt: (n: number) => string) => {
-    if (val != null && Number.isFinite(val)) rows.push({ k, v: fmt(val) });
-  };
-  push("Market Cap", f.marketCap, compactMoney);
-  push("P/E", f.peRatio, (n) => n.toFixed(2));
-  push("Fwd P/E", f.forwardPe, (n) => n.toFixed(2));
-  push("EPS", f.eps, (n) => n.toFixed(2));
-  push("Div Yield", f.dividendYield, (n) => percent(n, false));
-  push("Beta", f.beta, (n) => n.toFixed(2));
-  if (f.week52Low != null && f.week52High != null) {
-    rows.push({ k: "52W Range", v: `${fmtPrice(f.week52Low)} – ${fmtPrice(f.week52High)}` });
+// Section visibility (persisted). Missing keys default to visible, so adding a
+// new section later turns it on for existing users.
+function loadVisible(): Record<string, boolean> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(VIS_KEY) || "{}") as Record<string, boolean>;
+    const out: Record<string, boolean> = {};
+    for (const s of SECTIONS) out[s.key] = raw[s.key] !== false;
+    return out;
+  } catch {
+    return Object.fromEntries(SECTIONS.map((s) => [s.key, true]));
   }
-  push("Avg Vol", f.avgVolume, compactNum);
-  push("Shares Out", f.sharesOutstanding, compactNum);
-  if (f.nextEarningsDate != null && Number.isFinite(f.nextEarningsDate)) {
-    rows.push({ k: "Next Earnings", v: fmtDate(f.nextEarningsDate) });
-  }
-  return rows;
 }
 
 export function SymbolInfo({ symbol }: { symbol: string }) {
-  const [data, setData] = useState<Fundamentals | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [expanded, setExpanded] = useState(false);
+  const quote = useStore((s) => s.quotes[symbol]);
+  const [detail, setDetail] = useState<SymbolDetail | null>(null);
+  const [options, setOptions] = useState<OptionsSummary | null>(null);
+  const [daily, setDaily] = useState<Candle[]>([]);
+  const [weekly, setWeekly] = useState<Candle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [visible, setVisible] = useState<Record<string, boolean>>(loadVisible);
+  const [menu, setMenu] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    setState("loading");
-    setData(null);
-    setExpanded(false);
-    api
-      .fundamentals(symbol)
-      .then((f) => {
-        if (!alive) return;
-        setData(f);
-        setState("ready");
-      })
-      .catch(() => {
-        if (!alive) return;
-        setState("error");
-      });
+    setLoading(true);
+    setDetail(null);
+    setOptions(null);
+    setDaily([]);
+    setWeekly([]);
+    api.symbolDetail(symbol).then((d) => alive && (setDetail(d), setLoading(false))).catch(() => alive && setLoading(false));
+    api.options(symbol).then((o) => alive && setOptions(o)).catch(() => {});
+    api.candles(symbol, "1Y").then((s) => alive && setDaily(s.candles)).catch(() => {});
+    api.candles(symbol, "5Y").then((s) => alive && setWeekly(s.candles)).catch(() => {});
     return () => {
       alive = false;
     };
   }, [symbol]);
 
-  const rows = data ? buildRows(data) : [];
+  const toggle = (key: string) => {
+    setVisible((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(VIS_KEY, JSON.stringify(next));
+      } catch {
+        /* quota */
+      }
+      return next;
+    });
+  };
+
+  const ctx: SectionCtx = { symbol, detail, quote, daily, weekly, options };
 
   return (
     <div className="panel si-panel">
       <div className="panel-head">
-        <span className="panel-title">Profile</span>
+        <span className="panel-title">Symbol info</span>
         <span className="spacer" />
-        <span className="eyebrow mono">{symbol}</span>
-      </div>
-
-      <div className="panel-body panel-pad">
-        {state === "loading" && (
-          <>
-            <div className="si-head">
-              <div className="skel" style={{ height: 18, width: "70%", marginBottom: 8 }} />
-              <div className="skel" style={{ height: 11, width: "45%" }} />
-            </div>
-            <div style={{ marginTop: 12 }}>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="kv">
-                  <span className="skel" style={{ height: 11, width: 70 }} />
-                  <span className="skel" style={{ height: 11, width: 54 }} />
+        <div style={{ position: "relative" }}>
+          <button
+            className={`iconbtn ${menu ? "on" : ""}`}
+            title="Choose sections"
+            onClick={() => setMenu((m) => !m)}
+          >
+            <IconGear size={15} />
+          </button>
+          {menu && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 19 }} onClick={() => setMenu(false)} />
+              <div className="si-menu">
+                <div className="si-menu-head">
+                  <span className="eyebrow">Sections</span>
+                  <button className="iconbtn" onClick={() => setMenu(false)} aria-label="Close">
+                    <IconX size={14} />
+                  </button>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {state === "error" && (
-          <div className="empty" style={{ height: "auto", padding: "28px 8px" }}>
-            Profile unavailable
-          </div>
-        )}
-
-        {state === "ready" && data && (
-          <>
-            <div className="si-head">
-              <div className="si-name serif">{data.longName || symbol}</div>
-              {(data.sector || data.industry) && (
-                <div className="si-tags">
-                  {data.sector && <span className="si-tag">{data.sector}</span>}
-                  {data.industry && <span className="si-tag dim">{data.industry}</span>}
-                </div>
-              )}
-            </div>
-
-            {rows.length > 0 ? (
-              <div className="si-kv">
-                {rows.map((r) => (
-                  <div key={r.k} className="kv">
-                    <span className="k">{r.k}</span>
-                    <span className="v">{r.v}</span>
-                  </div>
+                {SECTIONS.map((s) => (
+                  <label key={s.key} className="si-menu-item">
+                    <input type="checkbox" checked={!!visible[s.key]} onChange={() => toggle(s.key)} />
+                    <span>{s.label}</span>
+                  </label>
                 ))}
               </div>
-            ) : (
-              <div className="empty" style={{ height: "auto", padding: "20px 8px" }}>
-                No stats available
-              </div>
-            )}
+            </>
+          )}
+        </div>
+      </div>
 
-            {data.description && (
-              <div className="si-desc">
-                <p className={expanded ? "" : "si-clamp"}>{data.description}</p>
-                <button className="si-more" onClick={() => setExpanded((v) => !v)}>
-                  {expanded ? "Show less" : "Show more"}
-                </button>
+      <div className="panel-body si-body">
+        <div className="si-hero">
+          <CompanyLogo symbol={symbol} size={40} radius={10} />
+          <div className="si-hero-text">
+            <div className="si-hero-name serif">{detail?.longName || quote?.name || symbol}</div>
+            <div className="si-hero-sub mono dim">
+              {symbol}
+              {detail?.exchange ? ` · ${detail.exchange}` : ""}
+            </div>
+          </div>
+        </div>
+
+        {loading && !detail ? (
+          <div style={{ padding: "8px 0" }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="kv">
+                <span className="skel" style={{ height: 11, width: 70 }} />
+                <span className="skel" style={{ height: 11, width: 54 }} />
               </div>
-            )}
-          </>
+            ))}
+          </div>
+        ) : (
+          SECTIONS.filter((s) => visible[s.key]).map((s) => (
+            <Section key={s.key} title={s.label}>
+              <SectionBody k={s.key} ctx={ctx} />
+            </Section>
+          ))
         )}
       </div>
     </div>

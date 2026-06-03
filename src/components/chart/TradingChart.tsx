@@ -23,6 +23,7 @@ import {
 import { DrawingLayer, migrateDrawings, type DrawTool, type Drawing } from "./DrawingLayer";
 import { DrawingToolbar, ToolIcon } from "./DrawingToolbar";
 import { ObjectsPanel } from "./ObjectsPanel";
+import { ChartHeader } from "../ChartHeader";
 import { IconLayers } from "../common/icons";
 import {
   sma,
@@ -159,7 +160,7 @@ function loadParams(): IndicatorParams {
   }
 }
 
-export function TradingChart({ symbol }: { symbol: string }) {
+export function TradingChart({ symbol, onOpenSearch }: { symbol: string; onOpenSearch: () => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ISeriesApi<any> | null>(null);
@@ -1126,6 +1127,7 @@ export function TradingChart({ symbol }: { symbol: string }) {
 
   return (
     <div className="panel t-chart">
+      <ChartHeader onOpenSearch={onOpenSearch} />
       <ChartToolbar
         tf={tf}
         setTf={setTf}

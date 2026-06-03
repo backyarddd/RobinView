@@ -10,7 +10,6 @@ import {
   IconGear,
   IconFunnel,
 } from "./common/icons";
-import { TopBar } from "./TopBar";
 import { CommandPalette } from "./CommandPalette";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { SettingsModal } from "./SettingsModal";
@@ -134,8 +133,6 @@ export function AppShell() {
           {hasUpdate && <span className="rail-version-dot" />}
         </button>
       </nav>
-
-      <TopBar onOpenSearch={() => setPalette(true)} />
 
       <main className="main">
         {/* Terminal stays mounted (just hidden) across tab switches: it owns
