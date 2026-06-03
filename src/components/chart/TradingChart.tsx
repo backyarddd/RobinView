@@ -306,13 +306,14 @@ export function TradingChart({ symbol }: { symbol: string }) {
       ls.setData(pts.map((p) => ({ time: p.time as Time, value: p.value })));
       overlayRefs.current[key] = ls;
     };
-    if (indicators.has("sma20")) addLine("sma20", toLine(cs, sma(c, 20)), OVERLAY_COLORS.sma20);
-    if (indicators.has("sma50")) addLine("sma50", toLine(cs, sma(c, 50)), OVERLAY_COLORS.sma50);
-    if (indicators.has("sma100")) addLine("sma100", toLine(cs, sma(c, 100)), OVERLAY_COLORS.sma100);
-    if (indicators.has("sma200")) addLine("sma200", toLine(cs, sma(c, 200)), OVERLAY_COLORS.sma200);
-    if (indicators.has("ema9")) addLine("ema9", toLine(cs, ema(c, 9)), OVERLAY_COLORS.ema9);
-    if (indicators.has("ema21")) addLine("ema21", toLine(cs, ema(c, 21)), OVERLAY_COLORS.ema21);
-    if (indicators.has("ema50")) addLine("ema50", toLine(cs, ema(c, 50)), OVERLAY_COLORS.ema50);
+    // Moving-average overlays are uniform — drive them from a table.
+    const MAS: [IndicatorKey, (v: number[], p: number) => number[], number][] = [
+      ["sma20", sma, 20], ["sma50", sma, 50], ["sma100", sma, 100], ["sma200", sma, 200],
+      ["ema9", ema, 9], ["ema21", ema, 21], ["ema50", ema, 50],
+    ];
+    for (const [key, fn, p] of MAS) {
+      if (indicators.has(key)) addLine(key, toLine(cs, fn(c, p)), OVERLAY_COLORS[key]);
+    }
     if (indicators.has("vwap")) addLine("vwap", toLine(cs, vwap(cs)), OVERLAY_COLORS.vwap);
     if (indicators.has("bb")) {
       const b = bollinger(c, 20, 2);
@@ -382,7 +383,7 @@ export function TradingChart({ symbol }: { symbol: string }) {
   useEffect(() => {
     if (osc && oscChartRef.current) drawOsc();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol, tf, osc, loading]);
+  }, [symbol, tf, osc]);
 
   function drawOsc() {
     const chart = oscChartRef.current;
@@ -393,16 +394,17 @@ export function TradingChart({ symbol }: { symbol: string }) {
     const c = closes(cs);
     const line = (color: string, w = 2) =>
       chart.addLineSeries({ color, lineWidth: w as any, priceLineVisible: false, lastValueVisible: true });
-    const band = (price: number, color: string, title: string) =>
-      oscRefs.current[0]?.createPriceLine({ price, color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title });
+    const plot = (color: string, values: number[], w = 2) => {
+      const l = line(color, w);
+      l.setData(toLine(cs, values).map((p) => ({ time: p.time as Time, value: p.value })));
+      return l;
+    };
+    const band = (price: number, color: string) =>
+      oscRefs.current[0]?.createPriceLine({ price, color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: String(price) });
+    const UP = "rgba(52,226,155,0.4)";
+    const DOWN = "rgba(255,106,87,0.4)";
 
-    if (osc === "rsi") {
-      const l = line("#c08bff");
-      l.setData(toLine(cs, rsi(c, 14)).map((p) => ({ time: p.time as Time, value: p.value })));
-      oscRefs.current = [l];
-      band(70, "rgba(255,106,87,0.4)", "70");
-      band(30, "rgba(52,226,155,0.4)", "30");
-    } else if (osc === "macd") {
+    if (osc === "macd") {
       const m = macd(c);
       const hist = chart.addHistogramSeries({ priceLineVisible: false });
       hist.setData(
@@ -412,39 +414,26 @@ export function TradingChart({ symbol }: { symbol: string }) {
           color: (m.histogram[i] ?? 0) >= 0 ? "rgba(52,226,155,0.45)" : "rgba(255,106,87,0.45)",
         })),
       );
-      const macdLine = line("#6fa8ff");
-      macdLine.setData(toLine(cs, m.macd).map((p) => ({ time: p.time as Time, value: p.value })));
-      const sigLine = line("#e3b766", 1);
-      sigLine.setData(toLine(cs, m.signal).map((p) => ({ time: p.time as Time, value: p.value })));
-      oscRefs.current = [hist, macdLine, sigLine];
+      oscRefs.current = [hist, plot("#6fa8ff", m.macd), plot("#e3b766", m.signal, 1)];
     } else if (osc === "stoch") {
       const s = stochastic(cs, 14, 3, 3);
-      const kL = line("#6fa8ff");
-      kL.setData(toLine(cs, s.k).map((p) => ({ time: p.time as Time, value: p.value })));
-      const dL = line("#e3b766", 1);
-      dL.setData(toLine(cs, s.d).map((p) => ({ time: p.time as Time, value: p.value })));
-      oscRefs.current = [kL, dL];
-      band(80, "rgba(255,106,87,0.4)", "80");
-      band(20, "rgba(52,226,155,0.4)", "20");
-    } else if (osc === "williams") {
-      const l = line("#c08bff");
-      l.setData(toLine(cs, williamsR(cs, 14)).map((p) => ({ time: p.time as Time, value: p.value })));
-      oscRefs.current = [l];
-      band(-20, "rgba(255,106,87,0.4)", "-20");
-      band(-80, "rgba(52,226,155,0.4)", "-80");
-    } else if (osc === "atr") {
-      const l = line("#ff9f7a");
-      l.setData(toLine(cs, atr(cs, 14)).map((p) => ({ time: p.time as Time, value: p.value })));
-      oscRefs.current = [l];
-    } else if (osc === "obv") {
-      const l = line("#5ad1c4");
-      l.setData(toLine(cs, obv(cs)).map((p) => ({ time: p.time as Time, value: p.value })));
-      oscRefs.current = [l];
-    } else if (osc === "roc") {
-      const l = line("#9bd45a");
-      l.setData(toLine(cs, roc(c, 12)).map((p) => ({ time: p.time as Time, value: p.value })));
-      oscRefs.current = [l];
-      band(0, "rgba(255,255,255,0.2)", "0");
+      oscRefs.current = [plot("#6fa8ff", s.k), plot("#e3b766", s.d, 1)];
+      band(80, DOWN);
+      band(20, UP);
+    } else {
+      // Single-line oscillators share one shape: a line plus optional bands.
+      const SINGLE: Partial<Record<IndicatorKey, { color: string; values: number[]; bands?: [number, string][] }>> = {
+        rsi: { color: "#c08bff", values: rsi(c, 14), bands: [[70, DOWN], [30, UP]] },
+        williams: { color: "#c08bff", values: williamsR(cs, 14), bands: [[-20, DOWN], [-80, UP]] },
+        atr: { color: "#ff9f7a", values: atr(cs, 14) },
+        obv: { color: "#5ad1c4", values: obv(cs) },
+        roc: { color: "#9bd45a", values: roc(c, 12), bands: [[0, "rgba(255,255,255,0.2)"]] },
+      };
+      const cfg = osc ? SINGLE[osc] : undefined;
+      if (cfg) {
+        oscRefs.current = [plot(cfg.color, cfg.values)];
+        cfg.bands?.forEach(([p, col]) => band(p, col));
+      }
     }
     chart.timeScale().fitContent();
   }
@@ -723,20 +712,27 @@ export function TradingChart({ symbol }: { symbol: string }) {
             >
               ⏭
             </button>
-            <span className="replay-info mono">
-              {candlesRef.current[Math.min(replayIdx, candlesRef.current.length - 1)]
-                ? fmtDate(candlesRef.current[Math.min(replayIdx, candlesRef.current.length - 1)].time * 1000)
-                : ""}
-              <span className="dim"> · bar {Math.min(replayIdx + 1, candlesRef.current.length)}/{candlesRef.current.length}</span>
-            </span>
-            <input
-              className="replay-range"
-              type="range"
-              min={2}
-              max={Math.max(2, candlesRef.current.length - 1)}
-              value={Math.min(replayIdx, candlesRef.current.length - 1)}
-              onChange={(e) => setReplayIdx(Number(e.target.value))}
-            />
+            {(() => {
+              const total = candlesRef.current.length;
+              const idx = Math.min(replayIdx, total - 1);
+              const bar = candlesRef.current[idx];
+              return (
+                <>
+                  <span className="replay-info mono">
+                    {bar ? fmtDate(bar.time * 1000) : ""}
+                    <span className="dim"> · bar {Math.min(replayIdx + 1, total)}/{total}</span>
+                  </span>
+                  <input
+                    className="replay-range"
+                    type="range"
+                    min={2}
+                    max={Math.max(2, total - 1)}
+                    value={idx}
+                    onChange={(e) => setReplayIdx(Number(e.target.value))}
+                  />
+                </>
+              );
+            })()}
           </div>
         )}
 

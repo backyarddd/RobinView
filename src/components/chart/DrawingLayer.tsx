@@ -60,6 +60,10 @@ export function DrawingLayer({
   const [edit, setEdit] = useState<Drawing | null>(null); // shape being dragged
   const [measure, setMeasure] = useState<Drawing | null>(null); // transient ruler
   const drafting = useRef(false);
+  // Is there anything that needs re-projecting on pan/zoom? Kept in a ref so the
+  // chart's range-change subscription can cheaply skip re-renders when empty.
+  const hasContent = useRef(false);
+  hasContent.current = drawings.length > 0 || !!draft || !!edit || !!measure;
 
   // clear the measurement when leaving the measure tool or pressing Escape
   useEffect(() => {
@@ -77,7 +81,12 @@ export function DrawingLayer({
   useEffect(() => {
     const ts = chart.timeScale();
     const bump = () => force((n) => n + 1);
-    ts.subscribeVisibleLogicalRangeChange(bump);
+    // During a pan/zoom this fires every frame — skip the re-render when there's
+    // nothing drawn to re-project.
+    const onRange = () => {
+      if (hasContent.current) bump();
+    };
+    ts.subscribeVisibleLogicalRangeChange(onRange);
     const ro = new ResizeObserver(() => {
       if (svgRef.current) {
         const r = svgRef.current.getBoundingClientRect();
@@ -87,7 +96,7 @@ export function DrawingLayer({
     });
     if (svgRef.current) ro.observe(svgRef.current);
     return () => {
-      ts.unsubscribeVisibleLogicalRangeChange(bump);
+      ts.unsubscribeVisibleLogicalRangeChange(onRange);
       ro.disconnect();
     };
   }, [chart]);
@@ -413,5 +422,5 @@ export function DrawingLayer({
 }
 
 function id() {
-  return Math.random().toString(36).slice(2, 10);
+  return crypto.randomUUID();
 }

@@ -1,6 +1,7 @@
 // Minimal inline icon set (stroke-based, 1.6 weight) — no icon dependency.
 type P = { size?: number };
-const S = (size = 18) => ({
+// Shared stroke-icon <svg> prop factory (reused by chart/drawing toolbars too).
+export const S = (size = 18) => ({
   width: size,
   height: size,
   viewBox: "0 0 24 24",

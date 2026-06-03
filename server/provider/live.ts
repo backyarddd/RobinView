@@ -9,18 +9,13 @@ import type {
   SearchResult,
   Timeframe,
   AssetClass,
+  RobinhoodStatus,
 } from "../../shared/types.js";
 import { fetchQuotes, searchSymbols } from "./quotes.js";
 import { fetchHistory } from "./history.js";
 import { genCandles, intervalFor } from "./market.js";
 import { RobinhoodConnection } from "./robinhood.js";
-
-export interface RobinhoodStatus {
-  connected: boolean;
-  connecting: boolean;
-  hasSession: boolean;
-  error: string | null;
-}
+import { round2 } from "./util.js";
 
 // The real-data provider. Market data (quotes, candles, search) is always live
 // from a keyless market source — this is the TradingView half and needs no auth.
@@ -114,11 +109,11 @@ export class LiveProvider implements DataProvider {
     return positions.sort((a, b) => b.marketValue - a.marketValue);
   }
 
-  async getPortfolio(account: string): Promise<Portfolio | null> {
+  async getPortfolio(account: string, pre?: Position[]): Promise<Portfolio | null> {
     if (!account || !this.rh.status().connected) return null;
     const [raw, positions] = await Promise.all([
       this.rh.getPortfolio(account),
-      this.getPositions(account),
+      pre ?? this.getPositions(account),
     ]);
     // Revalue live from positions so the total ticks with the market.
     const equityValue = positions.reduce((a, p) => a + p.marketValue, 0);
@@ -149,8 +144,4 @@ export class LiveProvider implements DataProvider {
     if (!account || !this.rh.status().connected) return [];
     return this.rh.getOrders(account);
   }
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
 }

@@ -1,4 +1,5 @@
 import type { Candle, Timeframe, Interval } from "../../shared/types.js";
+import { round2 } from "./util.js";
 
 // Deterministic PRNG (mulberry32) so a given symbol always renders the same history.
 export function rng(seed: number) {
@@ -115,6 +116,3 @@ export function genCandles(
   return candles;
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}

@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { FileOAuthProvider } from "./oauth.js";
+import { num } from "./util.js";
 import type { Account, OrderRow } from "../../shared/types.js";
 
 const DEFAULT_URL = process.env.ROBINHOOD_MCP_URL || "https://agent.robinhood.com/mcp/trading";
@@ -225,9 +226,4 @@ export class RobinhoodConnection {
       }));
     });
   }
-}
-
-function num(v: unknown): number {
-  const n = typeof v === "string" ? parseFloat(v) : (v as number);
-  return Number.isFinite(n) ? n : 0;
 }

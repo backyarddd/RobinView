@@ -1,4 +1,5 @@
 import type { Candle, Timeframe } from "../../shared/types.js";
+import { fetchWithTimeout, round2 } from "./util.js";
 
 // Real historical OHLC from the Yahoo Finance v8 chart API.
 // Keyless, covers intraday + daily + weekly, and is the source of truth for
@@ -43,13 +44,7 @@ export async function fetchHistory(symbol: string, tf: Timeframe): Promise<Candl
     `?range=${range}&interval=${interval}&includePrePost=false`;
 
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 9000);
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers: { "User-Agent": "Mozilla/5.0 (RobinView)" },
-    });
-    clearTimeout(timer);
+    const res = await fetchWithTimeout(url, {}, 9000);
     if (!res.ok) return null;
     const json: any = await res.json();
     const result = json?.chart?.result?.[0];
@@ -85,8 +80,4 @@ export async function fetchHistory(symbol: string, tf: Timeframe): Promise<Candl
   } catch {
     return null;
   }
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
 }

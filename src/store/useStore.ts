@@ -79,8 +79,9 @@ function load<T>(key: string, fallback: T): T {
   }
 }
 
-function uid(): string {
-  return Math.random().toString(36).slice(2, 9);
+// Normalize an RhStatus-shaped object into the store's robinhood slice.
+function rhFrom(s: { connected: boolean; hasSession: boolean; available?: boolean }) {
+  return { connected: s.connected, hasSession: s.hasSession, available: !!s.available };
 }
 
 // Load watchlist groups, migrating a legacy single list if present.
@@ -88,12 +89,24 @@ function loadWatchlists(): { lists: WatchlistGroup[]; activeId: string } {
   const saved = load<{ lists: WatchlistGroup[]; activeId: string } | null>(WATCHLISTS_KEY, null);
   if (saved && saved.lists?.length) return saved;
   const legacy = load<string[]>(WATCHLIST_KEY, ["NVDA", "AAPL", "TSLA", "MSFT", "AMD", "SPY", "BTC-USD"]);
-  const lists: WatchlistGroup[] = [{ id: uid(), name: "My List", symbols: legacy }];
+  const lists: WatchlistGroup[] = [{ id: crypto.randomUUID(), name: "My List", symbols: legacy }];
   return { lists, activeId: lists[0].id };
 }
 
 function persistLists(lists: WatchlistGroup[], activeId: string) {
   localStorage.setItem(WATCHLISTS_KEY, JSON.stringify({ lists, activeId }));
+}
+
+// Single place that updates the lists, the active id, the `watchlist` mirror,
+// and persistence together — so no action can desync them.
+function commitLists(
+  set: (p: Partial<StoreState>) => void,
+  lists: WatchlistGroup[],
+  activeId: string,
+) {
+  const active = lists.find((l) => l.id === activeId);
+  set({ watchlists: lists, activeListId: activeId, watchlist: active?.symbols ?? [] });
+  persistLists(lists, activeId);
 }
 
 const _wl = loadWatchlists();
@@ -124,9 +137,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const status = await api.robinhood.status().catch(() => null);
     set({
       mode: health.mode,
-      robinhood: status
-        ? { connected: status.connected, hasSession: status.hasSession, available: status.available }
-        : { connected: false, hasSession: false, available: false },
+      robinhood: status ? rhFrom(status) : { connected: false, hasSession: false, available: false },
     });
     // Demo mode has simulated accounts; live mode loads them once connected.
     if (health.mode === "demo" || status?.connected) await get().refreshAccount();
@@ -137,7 +148,7 @@ export const useStore = create<StoreState>((set, get) => ({
       window.addEventListener("message", (e) => {
         if (e.data === "robinview:robinhood:connected") {
           api.robinhood.status().then((s) => {
-            set({ robinhood: { connected: s.connected, hasSession: s.hasSession, available: s.available }, connectingRobinhood: false });
+            set({ robinhood: rhFrom(s), connectingRobinhood: false });
             if (s.connected) get().refreshAccount();
           });
         }
@@ -159,7 +170,7 @@ export const useStore = create<StoreState>((set, get) => ({
           const s = await api.robinhood.status().catch(() => null);
           if (s?.connected) {
             clearInterval(poll);
-            set({ robinhood: { connected: s.connected, hasSession: s.hasSession, available: s.available }, connectingRobinhood: false });
+            set({ robinhood: rhFrom(s), connectingRobinhood: false });
             await get().refreshAccount();
           } else if (tries > 150) {
             clearInterval(poll);
@@ -168,7 +179,7 @@ export const useStore = create<StoreState>((set, get) => ({
         }, 2000);
       } else if (r.connected) {
         const s = await api.robinhood.status();
-        set({ robinhood: { connected: s.connected, hasSession: s.hasSession, available: s.available }, connectingRobinhood: false });
+        set({ robinhood: rhFrom(s), connectingRobinhood: false });
         await get().refreshAccount();
       } else {
         set({ connectingRobinhood: false });
@@ -242,9 +253,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const lists = watchlists.map((l) =>
       l.id === activeListId && !l.symbols.includes(s) ? { ...l, symbols: [s, ...l.symbols] } : l,
     );
-    const active = lists.find((l) => l.id === activeListId)!;
-    set({ watchlists: lists, watchlist: active.symbols });
-    persistLists(lists, activeListId);
+    commitLists(set, lists, activeListId);
     subscribeAll(get);
   },
 
@@ -254,40 +263,31 @@ export const useStore = create<StoreState>((set, get) => ({
     const lists = watchlists.map((l) =>
       l.id === activeListId ? { ...l, symbols: l.symbols.filter((x) => x !== s) } : l,
     );
-    const active = lists.find((l) => l.id === activeListId)!;
-    set({ watchlists: lists, watchlist: active.symbols });
-    persistLists(lists, activeListId);
+    commitLists(set, lists, activeListId);
   },
 
   createWatchlist: (name) => {
-    const list: WatchlistGroup = { id: uid(), name: name.trim() || "New List", symbols: [] };
-    const lists = [...get().watchlists, list];
-    set({ watchlists: lists, activeListId: list.id, watchlist: list.symbols });
-    persistLists(lists, list.id);
+    const list: WatchlistGroup = { id: crypto.randomUUID(), name: name.trim() || "New List", symbols: [] };
+    commitLists(set, [...get().watchlists, list], list.id);
     subscribeAll(get);
   },
 
   renameWatchlist: (id, name) => {
     const lists = get().watchlists.map((l) => (l.id === id ? { ...l, name: name.trim() || l.name } : l));
-    set({ watchlists: lists });
-    persistLists(lists, get().activeListId);
+    commitLists(set, lists, get().activeListId);
   },
 
   deleteWatchlist: (id) => {
     let lists = get().watchlists.filter((l) => l.id !== id);
-    if (lists.length === 0) lists = [{ id: uid(), name: "My List", symbols: [] }];
+    if (lists.length === 0) lists = [{ id: crypto.randomUUID(), name: "My List", symbols: [] }];
     const activeListId = get().activeListId === id ? lists[0].id : get().activeListId;
-    const active = lists.find((l) => l.id === activeListId)!;
-    set({ watchlists: lists, activeListId, watchlist: active.symbols });
-    persistLists(lists, activeListId);
+    commitLists(set, lists, activeListId);
     subscribeAll(get);
   },
 
   setActiveWatchlist: (id) => {
-    const active = get().watchlists.find((l) => l.id === id);
-    if (!active) return;
-    set({ activeListId: id, watchlist: active.symbols });
-    persistLists(get().watchlists, id);
+    if (!get().watchlists.some((l) => l.id === id)) return;
+    commitLists(set, get().watchlists, id);
     subscribeAll(get);
   },
 
@@ -327,7 +327,7 @@ export const useStore = create<StoreState>((set, get) => ({
       set({ mode: msg.mode, connected: true });
     } else if (msg.type === "rhstatus") {
       const prev = get().robinhood;
-      set({ robinhood: { connected: msg.connected, hasSession: msg.hasSession, available: msg.available } });
+      set({ robinhood: rhFrom(msg) });
       if (msg.connected && !prev.connected) get().refreshAccount();
       if (!msg.connected && prev.connected)
         set({ accounts: [], account: "", portfolio: null, positions: [], orders: [], equityTrail: [] });

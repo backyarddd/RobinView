@@ -41,7 +41,8 @@ export function MarketsView() {
   const list = MARKET_SYMBOLS.map((s) => quotes[s]).filter(Boolean) as Quote[];
   const gainers = [...list].sort((a, b) => b.changePct - a.changePct).slice(0, 8);
   const losers = [...list].sort((a, b) => a.changePct - b.changePct).slice(0, 8);
-  const active = [...list].sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0)).slice(0, 8);
+  // Spark quotes carry no volume, so rank "most active" by absolute move.
+  const active = [...list].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0, 8);
 
   return (
     <div className="pf">
@@ -89,7 +90,7 @@ export function MarketsView() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
           <MoverList title="Top Gainers" rows={gainers} onPick={select} />
           <MoverList title="Top Losers" rows={losers} onPick={select} />
-          <MoverList title="Most Active" rows={active} onPick={select} volume />
+          <MoverList title="Most Active" rows={active} onPick={select} />
         </div>
       </div>
     </div>
@@ -100,12 +101,10 @@ function MoverList({
   title,
   rows,
   onPick,
-  volume,
 }: {
   title: string;
   rows: Quote[];
   onPick: (s: string) => void;
-  volume?: boolean;
 }) {
   return (
     <div className="panel">
@@ -127,7 +126,6 @@ function MoverList({
             </div>
             <div className="mono" style={{ textAlign: "right", fontSize: 13 }}>
               {fmtPrice(q.price)}
-              {volume && <div className="dim" style={{ fontSize: 11 }}>{compactNum(q.volume ?? 0)}</div>}
             </div>
             <ChangePill pct={q.changePct} />
           </div>

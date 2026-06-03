@@ -1,34 +1,17 @@
-import { getYahooCrumb } from "./fundamentals.js";
+import type { ScreenerRow } from "../../shared/types.js";
 import { fetchQuotes } from "./quotes.js";
 import { UNIVERSE } from "./universe.js";
-
-// Matches the ScreenerRow contract in src/lib/api.ts (frontend cannot be imported here).
-export interface ScreenerRow {
-  symbol: string;
-  name: string;
-  price: number;
-  changePct: number;
-  marketCap?: number;
-  volume?: number;
-  peRatio?: number;
-}
+import { fetchWithTimeout, getYahooCrumb, rawNum as num } from "./util.js";
 
 // Predefined screeners (gainers / losers / most actives).
 // Primary:  Yahoo predefined saved screener (cookie + crumb gated).
 // Fallback: compute from a broad symbol universe via real quotes so we
 //           always return something.
-
-const UA = "Mozilla/5.0 (RobinView)";
 const TTL = 60_000; // 60 s
 
 export type Preset = "day_gainers" | "day_losers" | "most_actives";
 const PRESETS: Preset[] = ["day_gainers", "day_losers", "most_actives"];
-
-interface CacheEntry {
-  at: number;
-  rows: ScreenerRow[];
-}
-const cache = new Map<string, CacheEntry>();
+const cache = new Map<string, { at: number; rows: ScreenerRow[] }>();
 
 // Broaden the fallback universe beyond the demo list with a few liquid names.
 const EXTRAS = [
@@ -71,14 +54,7 @@ async function fromYahooScreener(preset: Preset): Promise<ScreenerRow[] | null> 
     const url =
       `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved` +
       `?count=25&scrIds=${encodeURIComponent(preset)}&crumb=${encodeURIComponent(cr.crumb)}`;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 9000);
-    let res: Response;
-    try {
-      res = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": UA, Cookie: cr.cookie } });
-    } finally {
-      clearTimeout(timer);
-    }
+    const res = await fetchWithTimeout(url, { headers: { Cookie: cr.cookie } });
     if (res.status === 401 || res.status === 403) continue;
     if (!res.ok) return null;
     const json: any = await res.json();
@@ -89,11 +65,6 @@ async function fromYahooScreener(preset: Preset): Promise<ScreenerRow[] | null> 
       .filter((r): r is ScreenerRow => r !== null);
   }
   return null;
-}
-
-function num(v: any): number | undefined {
-  const n = typeof v === "object" && v ? v.raw : v;
-  return typeof n === "number" && Number.isFinite(n) ? n : undefined;
 }
 
 function mapYahooRow(q: any): ScreenerRow | null {

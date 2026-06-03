@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Timeframe } from "@shared/types";
-import { IconCandle, IconLine, IconArea, IconLayers, IconStar } from "../common/icons";
+import { IconCandle, IconLine, IconArea, IconLayers, IconStar, S } from "../common/icons";
 import { useStore } from "../../store/useStore";
 
 export type ChartType = "candles" | "heikin" | "area" | "baseline" | "line";
@@ -137,36 +137,27 @@ export function ChartToolbar({
           <>
             <div style={{ position: "fixed", inset: 0, zIndex: 19 }} onClick={() => setMenu(false)} />
             <div className="ind-menu">
-              <div className="eyebrow" style={{ padding: "6px 10px" }}>
-                Overlays
-              </div>
-              {OVERLAYS.map((ind) => {
-                const on = indicators.has(ind.key);
-                return (
-                  <div key={ind.key} className={`ind-item ${on ? "on" : ""}`} onClick={() => toggle(ind.key)}>
-                    <span className="ind-check">{on ? "✓" : ""}</span>
-                    <span style={{ flex: 1 }}>{ind.label}</span>
-                    <span className="dim" style={{ fontSize: 11 }}>
-                      {ind.hint}
-                    </span>
+              {([["Overlays", OVERLAYS], ["Oscillator (lower pane)", OSC_DEFS]] as const).map(
+                ([label, defs], gi) => (
+                  <div key={label}>
+                    <div className="eyebrow" style={{ padding: gi === 0 ? "6px 10px" : "10px 10px 6px" }}>
+                      {label}
+                    </div>
+                    {defs.map((ind) => {
+                      const on = indicators.has(ind.key);
+                      return (
+                        <div key={ind.key} className={`ind-item ${on ? "on" : ""}`} onClick={() => toggle(ind.key)}>
+                          <span className="ind-check">{on ? "✓" : ""}</span>
+                          <span style={{ flex: 1 }}>{ind.label}</span>
+                          <span className="dim" style={{ fontSize: 11 }}>
+                            {ind.hint}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-              <div className="eyebrow" style={{ padding: "10px 10px 6px" }}>
-                Oscillator (lower pane)
-              </div>
-              {OSC_DEFS.map((ind) => {
-                const on = indicators.has(ind.key);
-                return (
-                  <div key={ind.key} className={`ind-item ${on ? "on" : ""}`} onClick={() => toggle(ind.key)}>
-                    <span className="ind-check">{on ? "✓" : ""}</span>
-                    <span style={{ flex: 1 }}>{ind.label}</span>
-                    <span className="dim" style={{ fontSize: 11 }}>
-                      {ind.hint}
-                    </span>
-                  </div>
-                );
-              })}
+                ),
+              )}
             </div>
           </>
         )}
@@ -197,7 +188,7 @@ export function ChartToolbar({
   );
 }
 
-const ic = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+const ic = S(15);
 function HeikinIcon() { return <svg {...ic}><rect x="5" y="7" width="5" height="10" rx="1" /><rect x="14" y="9" width="5" height="7" rx="1" /><path d="M7.5 4v3M7.5 17v3M16.5 6v3M16.5 16v2" /></svg>; }
 function BaselineIcon() { return <svg {...ic}><path d="M3 12h18" strokeDasharray="2 2" strokeOpacity="0.6" /><path d="M3 14l4-5 4 2 4-6 5 4" /></svg>; }
 function ReplayIcon() { return <svg {...ic}><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4" /><path d="M10 9l5 3-5 3z" fill="currentColor" stroke="none" /></svg>; }

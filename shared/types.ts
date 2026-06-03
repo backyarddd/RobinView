@@ -117,8 +117,50 @@ export interface MarketMover {
 
 export interface RobinhoodStatus {
   connected: boolean;
+  connecting?: boolean;
   hasSession: boolean;
-  available: boolean;
+  available?: boolean;
+  error?: string | null;
+}
+
+// ── Free market-data contracts (Yahoo) — shared by server providers & client ──
+export interface Fundamentals {
+  symbol: string;
+  longName?: string;
+  sector?: string;
+  industry?: string;
+  description?: string;
+  marketCap?: number;
+  peRatio?: number;
+  forwardPe?: number;
+  eps?: number;
+  dividendYield?: number;
+  beta?: number;
+  week52High?: number;
+  week52Low?: number;
+  dayHigh?: number;
+  dayLow?: number;
+  avgVolume?: number;
+  sharesOutstanding?: number;
+  nextEarningsDate?: number;
+}
+
+export interface NewsItem {
+  title: string;
+  publisher?: string;
+  link: string;
+  publishedAt?: number;
+  thumbnail?: string;
+}
+
+export interface ScreenerRow {
+  symbol: string;
+  name: string;
+  price: number;
+  changePct: number;
+  marketCap?: number;
+  volume?: number;
+  peRatio?: number;
 }
 
 // WebSocket envelope: server -> client.

@@ -193,10 +193,10 @@ async function broadcast() {
     }
     if (pushPortfolio && c.account && accountLive) {
       try {
-        const [portfolio, positions] = await Promise.all([
-          provider.getPortfolio(c.account),
-          provider.getPositions(c.account),
-        ]);
+        // Compute positions once, then derive the portfolio from them (avoids a
+        // second positions pass inside getPortfolio).
+        const positions = await provider.getPositions(c.account);
+        const portfolio = await provider.getPortfolio(c.account, positions);
         if (portfolio) send(c.ws, { type: "portfolio", portfolio });
         send(c.ws, { type: "positions", positions });
       } catch {

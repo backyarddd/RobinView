@@ -1,5 +1,5 @@
 import type { DrawTool } from "./DrawingLayer";
-import { IconTrash } from "../common/icons";
+import { IconTrash, S } from "../common/icons";
 
 export const TOOL_META: Record<DrawTool, { name: string; desc: string }> = {
   cursor: { name: "Cursor", desc: "Select objects & pan / zoom the chart" },
@@ -19,16 +19,7 @@ const ORDER: DrawTool[] = ["cursor", "trend", "ray", "hline", "vline", "rect", "
 const COLORS = ["#34e29b", "#ff6a57", "#e3b766", "#6fa8ff", "#c08bff", "#eef2ee"];
 
 export function ToolIcon({ tool, size = 17 }: { tool: DrawTool; size?: number }) {
-  const s = {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.7,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
+  const s = S(size);
   switch (tool) {
     case "cursor": return <svg {...s}><path d="M5 3l6 16 2-7 7-2L5 3z" /></svg>;
     case "trend": return <svg {...s}><path d="M4 18L20 6" /><circle cx="4" cy="18" r="1.6" fill="currentColor" /><circle cx="20" cy="6" r="1.6" fill="currentColor" /></svg>;
@@ -107,6 +98,5 @@ export function DrawingToolbar({
 }
 
 function ClearIcon() {
-  const s = { width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  return <svg {...s}><path d="M4 7h16M9 11v6M15 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /><path d="M3 3l18 18" strokeWidth="1.4" /></svg>;
+  return <svg {...S(17)}><path d="M4 7h16M9 11v6M15 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /><path d="M3 3l18 18" strokeWidth="1.4" /></svg>;
 }

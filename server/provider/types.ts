@@ -15,7 +15,9 @@ import type {
 export interface DataProvider {
   readonly mode: "live" | "demo";
   getAccounts(): Promise<Account[]>;
-  getPortfolio(account: string): Promise<Portfolio | null>;
+  // `positions` may be passed when the caller has already computed them this
+  // tick, so the portfolio can be derived without recomputing positions.
+  getPortfolio(account: string, positions?: Position[]): Promise<Portfolio | null>;
   getPositions(account: string): Promise<Position[]>;
   getQuotes(symbols: string[]): Promise<Quote[]>;
   getCandles(symbol: string, timeframe: Timeframe): Promise<CandleSeries>;

@@ -1,23 +1,10 @@
-// Matches the NewsItem contract in src/lib/api.ts (frontend cannot be imported here).
-export interface NewsItem {
-  title: string;
-  publisher?: string;
-  link: string;
-  publishedAt?: number;
-  thumbnail?: string;
-}
+import type { NewsItem } from "../../shared/types.js";
+import { fetchWithTimeout } from "./util.js";
 
 // Real headlines from the Yahoo Finance search endpoint (keyless).
 // Same host used by quotes.ts search; json.news[] carries the articles.
-
-const UA = "Mozilla/5.0 (RobinView)";
 const TTL = 5 * 60_000; // 5 min
-
-interface CacheEntry {
-  at: number;
-  items: NewsItem[];
-}
-const cache = new Map<string, CacheEntry>();
+const cache = new Map<string, { at: number; items: NewsItem[] }>();
 
 export async function fetchNews(symbol: string): Promise<NewsItem[]> {
   const sym = symbol.toUpperCase();
@@ -28,10 +15,7 @@ export async function fetchNews(symbol: string): Promise<NewsItem[]> {
     const url =
       `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(sym)}` +
       `&newsCount=12&quotesCount=0`;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": UA } });
-    clearTimeout(timer);
+    const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return hit ? hit.items : [];
 
     const json: any = await res.json();

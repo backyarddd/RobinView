@@ -13,6 +13,7 @@ import type {
 import { UNIVERSE, lookup, nameFor } from "./universe.js";
 import { genCandles, intervalFor, rng, hashSymbol } from "./market.js";
 import { fetchHistory } from "./history.js";
+import { round2 } from "./util.js";
 
 interface LiveState {
   price: number;
@@ -164,8 +165,8 @@ export class MockProvider implements DataProvider {
     };
   }
 
-  async getPortfolio(account: string): Promise<Portfolio> {
-    const positions = await this.getPositions(account);
+  async getPortfolio(account: string, pre?: Position[]): Promise<Portfolio> {
+    const positions = pre ?? (await this.getPositions(account));
     const equityValue = positions.reduce((a, p) => a + p.marketValue, 0);
     const costBasis = positions.reduce((a, p) => a + p.costBasis, 0);
     const dayChange = positions.reduce((a, p) => a + p.dayChange, 0);
@@ -267,8 +268,4 @@ function gaussian(): number {
   const mul = Math.sqrt((-2 * Math.log(s)) / s);
   spare = v * mul;
   return u * mul;
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
 }

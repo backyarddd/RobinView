@@ -1,4 +1,5 @@
 import type { Quote, SearchResult, AssetClass } from "../../shared/types.js";
+import { fetchWithTimeout, num, round2 } from "./util.js";
 
 // Real live market quotes + symbol search from Yahoo Finance (keyless).
 // The spark endpoint returns intraday close series for many symbols in ONE call,
@@ -30,10 +31,7 @@ export async function fetchQuotes(symbols: string[]): Promise<Quote[]> {
     const url =
       `https://query1.finance.yahoo.com/v8/finance/spark?symbols=${encodeURIComponent(stale.join(","))}` +
       `&range=1d&interval=1m`;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    const res = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0 (RobinView)" } });
-    clearTimeout(timer);
+    const res = await fetchWithTimeout(url, {}, 8000);
     if (res.ok) {
       const json: any = await res.json();
       // spark returns either { SYM: {...} } or { spark: { result: [...] } }
@@ -100,10 +98,7 @@ export async function searchSymbols(query: string): Promise<SearchResult[]> {
   if (!q) return [];
   try {
     const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0`;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 7000);
-    const res = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0 (RobinView)" } });
-    clearTimeout(timer);
+    const res = await fetchWithTimeout(url, {}, 7000);
     if (!res.ok) return [];
     const json: any = await res.json();
     const quotes: any[] = json?.quotes ?? [];
@@ -127,12 +122,4 @@ export async function searchSymbols(query: string): Promise<SearchResult[]> {
   } catch {
     return [];
   }
-}
-
-function num(v: unknown): number {
-  const n = typeof v === "string" ? parseFloat(v) : (v as number);
-  return Number.isFinite(n) ? n : 0;
-}
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
 }
