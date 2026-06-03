@@ -4,6 +4,16 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.1]
+
+### Fixed
+
+- The right column now keeps the quote / buy-sell card at its natural height (it was being
+  squeezed and its Buy/Sell buttons clipped); the Symbol Info panel takes the remaining space and
+  scrolls on its own.
+- Symbol Info content is inset to match the panel header and the quote card, fixing the
+  misaligned spacing.
+
 ## [0.3.0]
 
 ### Added

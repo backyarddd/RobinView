@@ -445,6 +445,16 @@
   gap: 12px;
   min-height: 0;
 }
+/* The quote / buy-sell card keeps its natural height; the symbol-info panel
+   takes the remaining space and scrolls internally (so the buttons are never
+   clipped by a tall info panel). */
+.t-side > .panel:not(.si-panel) {
+  flex: 0 0 auto;
+}
+.t-side > .si-panel {
+  flex: 1 1 0;
+  min-height: 0;
+}
 .t-bottom {
   grid-area: bottom;
 }

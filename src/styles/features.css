@@ -71,6 +71,8 @@
 
 /* ----  Sectioned symbol info  ---- */
 .si-body {
+  /* Match the panel header / quote-card inset so content lines up. */
+  padding: 12px 14px 14px;
   overflow: auto;
 }
 .si-hero {
