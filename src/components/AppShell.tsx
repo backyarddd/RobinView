@@ -12,6 +12,7 @@ import {
 } from "./common/icons";
 import { TopBar } from "./TopBar";
 import { CommandPalette } from "./CommandPalette";
+import { ShortcutsHelp } from "./ShortcutsHelp";
 import { TerminalView } from "./views/TerminalView";
 import { PortfolioView } from "./views/PortfolioView";
 import { MarketsView } from "./views/MarketsView";
@@ -33,6 +34,7 @@ const NAV: { id: View; label: string; icon: (p: { size?: number }) => JSX.Elemen
 export function AppShell() {
   const [view, setView] = useState<View>("terminal");
   const [palette, setPalette] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
   const init = useStore((s) => s.init);
   const alerts = useStore((s) => s.alerts);
   const activeAlerts = alerts.filter((a) => !a.triggered).length;
@@ -47,9 +49,14 @@ export function AppShell() {
         e.preventDefault();
         setPalette((p) => !p);
       }
-      if (e.key === "/" && !palette && !(e.target as HTMLElement)?.matches?.("input,textarea")) {
+      const inField = (e.target as HTMLElement)?.matches?.("input,textarea,select");
+      if (e.key === "/" && !palette && !inField) {
         e.preventDefault();
         setPalette(true);
+      }
+      if (e.key === "?" && !inField) {
+        e.preventDefault();
+        setShortcuts((s) => !s);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -107,6 +114,7 @@ export function AppShell() {
       </main>
 
       <CommandPalette open={palette} onClose={() => setPalette(false)} onNavigate={setView} />
+      <ShortcutsHelp open={shortcuts} onClose={() => setShortcuts(false)} />
     </div>
   );
 }

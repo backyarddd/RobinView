@@ -8,7 +8,7 @@ import {
   type Time,
   type LogicalRange,
 } from "lightweight-charts";
-import type { Candle, Timeframe } from "@shared/types";
+import type { Candle, Timeframe, SearchResult } from "@shared/types";
 import { api } from "../../lib/api";
 import { useStore } from "../../store/useStore";
 import { ChartToolbar, OSCILLATORS, type ChartType, type IndicatorKey, type ScaleMode } from "./ChartToolbar";
@@ -45,6 +45,8 @@ const THEME = {
   border: "rgba(255,255,255,0.07)",
 };
 
+const CMP_COLORS = ["#e3b766", "#6fa8ff", "#c08bff", "#ff9f7a"];
+
 const OVERLAY_COLORS: Record<string, string> = {
   sma20: "#e3b766",
   sma50: "#6fa8ff",
@@ -77,6 +79,7 @@ export function TradingChart({ symbol }: { symbol: string }) {
   const mainSeriesRef = useRef<ISeriesApi<any> | null>(null);
   const volSeriesRef = useRef<ISeriesApi<any> | null>(null);
   const overlayRefs = useRef<Record<string, ISeriesApi<"Line">>>({});
+  const compareSeriesRef = useRef<Record<string, ISeriesApi<"Line">>>({});
   const oscRefs = useRef<ISeriesApi<any>[]>([]);
   const candlesRef = useRef<Candle[]>([]);
   const syncing = useRef(false);
@@ -96,6 +99,10 @@ export function TradingChart({ symbol }: { symbol: string }) {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [showObjects, setShowObjects] = useState(false);
   const [chartNonce, setChartNonce] = useState(0); // bumps when chart/series (re)created
+  const [compareSymbols, setCompareSymbols] = useState<string[]>([]);
+  const [cmpOpen, setCmpOpen] = useState(false);
+  const [cmpQuery, setCmpQuery] = useState("");
+  const [cmpResults, setCmpResults] = useState<SearchResult[]>([]);
 
   const liveQuote = useStore((s) => s.quotes[symbol]);
   const osc: IndicatorKey | null = OSCILLATORS.find((k) => indicators.has(k)) ?? null;
@@ -487,12 +494,71 @@ export function TradingChart({ symbol }: { symbol: string }) {
     chartRef.current.applyOptions({ handleScroll: !drawing, handleScale: !drawing });
   }, [drawTool, chartNonce]);
 
-  // price scale mode: 0 normal · 1 logarithmic · 2 percentage
+  // price scale mode: 0 normal · 1 logarithmic · 2 percentage.
+  // Comparison overlays force percentage so different-priced symbols line up.
   useEffect(() => {
     if (!chartRef.current) return;
-    const mode = scaleMode === "log" ? 1 : scaleMode === "percent" ? 2 : 0;
+    const base = scaleMode === "log" ? 1 : scaleMode === "percent" ? 2 : 0;
+    const mode = compareSymbols.length > 0 ? 2 : base;
     chartRef.current.priceScale("right").applyOptions({ mode });
-  }, [scaleMode, chartNonce]);
+  }, [scaleMode, chartNonce, compareSymbols.length]);
+
+  // comparison overlays — normalized % lines on the same scale
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    let alive = true;
+    for (const sym of Object.keys(compareSeriesRef.current)) {
+      if (!compareSymbols.includes(sym)) {
+        chart.removeSeries(compareSeriesRef.current[sym]);
+        delete compareSeriesRef.current[sym];
+      }
+    }
+    compareSymbols.forEach((sym, i) => {
+      api
+        .candles(sym, tf)
+        .then((series) => {
+          if (!alive || !chartRef.current) return;
+          let s = compareSeriesRef.current[sym];
+          if (!s) {
+            s = chart.addLineSeries({
+              color: CMP_COLORS[i % CMP_COLORS.length],
+              lineWidth: 2,
+              priceLineVisible: false,
+              lastValueVisible: true,
+              crosshairMarkerVisible: true,
+            });
+            compareSeriesRef.current[sym] = s;
+          }
+          s.setData(series.candles.map((c) => ({ time: c.time as Time, value: c.close })));
+        })
+        .catch(() => {});
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareSymbols, tf, chartNonce]);
+
+  // compare-symbol search
+  useEffect(() => {
+    if (!cmpQuery.trim()) {
+      setCmpResults([]);
+      return;
+    }
+    const id = setTimeout(() => api.search(cmpQuery).then(setCmpResults).catch(() => setCmpResults([])), 150);
+    return () => clearTimeout(id);
+  }, [cmpQuery]);
+
+  const addCompare = (sym: string) => {
+    const s = sym.toUpperCase();
+    if (!s || s === symbol || compareSymbols.includes(s)) return;
+    setCompareSymbols((p) => [...p, s].slice(0, 4));
+    setCmpOpen(false);
+    setCmpQuery("");
+    setCmpResults([]);
+  };
+  const removeCompare = (sym: string) => setCompareSymbols((p) => p.filter((x) => x !== sym));
 
   // bar replay: re-render the visible slice when the index / toggle changes
   useEffect(() => {
@@ -680,6 +746,42 @@ export function TradingChart({ symbol }: { symbol: string }) {
             <span className="dim" style={{ fontFamily: "var(--font-mono)", fontWeight: 400 }}>
               {tf} · {type}
             </span>
+          </div>
+          <div className="cmp-row">
+            {compareSymbols.map((sym, i) => (
+              <span key={sym} className="cmp-chip" style={{ borderColor: CMP_COLORS[i % CMP_COLORS.length] }}>
+                <span className="cmp-dot" style={{ background: CMP_COLORS[i % CMP_COLORS.length] }} />
+                {sym}
+                <button onClick={() => removeCompare(sym)} title="Remove comparison">×</button>
+              </span>
+            ))}
+            <div className="cmp-add-wrap">
+              <button className="cmp-add" onClick={() => setCmpOpen((o) => !o)}>+ Compare</button>
+              {cmpOpen && (
+                <div className="cmp-search">
+                  <input
+                    autoFocus
+                    value={cmpQuery}
+                    placeholder="Add symbol to compare…"
+                    onChange={(e) => setCmpQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") addCompare(cmpQuery);
+                      if (e.key === "Escape") setCmpOpen(false);
+                    }}
+                  />
+                  {cmpResults.length > 0 && (
+                    <div className="cmp-results">
+                      {cmpResults.slice(0, 6).map((r) => (
+                        <div key={r.symbol} className="cmp-res" onClick={() => addCompare(r.symbol)}>
+                          <b>{r.symbol}</b>
+                          <span>{r.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           {legend && (
             <div className="chart-ohlc">

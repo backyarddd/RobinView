@@ -38,12 +38,14 @@ another app's credentials or copies data out of anything else.
 ## Features
 
 **Charting**
-- Candlestick / area / line charts powered by [`lightweight-charts`](https://github.com/tradingview/lightweight-charts) (TradingView's own open-source engine)
-- 7 timeframes (1D → ALL), volume histogram, crosshair OHLC readout
-- **Drawing tools**: trend line, ray, horizontal/vertical line, rectangle, Fibonacci retracement, freehand brush, text notes — color picker, select & delete, persisted per symbol
+- 5 chart types — **candlestick · Heikin Ashi · area · baseline · line** — powered by [`lightweight-charts`](https://github.com/tradingview/lightweight-charts) (TradingView's own open-source engine)
+- Price scale modes: **Linear · Log · Percent**; **bar replay** to step through history bar-by-bar; **export chart as PNG**
+- 7 timeframes (1D → ALL), volume histogram, crosshair OHLC readout, hover tooltips
+- **Drawing tools**: trend line, ray, horizontal/vertical line, rectangle, Fibonacci retracement, freehand brush, text notes — plus a **measure/ruler** tool (price %, $ and bars). Drag-to-edit endpoint handles, color picker, select & delete, an **Objects (layers) panel**, persisted per symbol
 - Overlays: **SMA 20/50/100/200, EMA 9/21/50, Bollinger Bands, VWAP, Parabolic SAR**
 - Synced oscillator pane: **RSI, MACD, Stochastic, Williams %R, ATR, OBV, Rate of Change**
 - Live last-price streamed into the forming candle
+- **Keyboard shortcuts** throughout — `T`/`R`/`H`/`V`/`B`/`F`/`D`/`X`/`M` pick drawing tools, `Esc` returns to the cursor, `?` opens the shortcuts cheat-sheet
 
 **Portfolio**
 - Editorial hero with total value, day change, total return, buying power, cost basis
@@ -64,6 +66,31 @@ another app's credentials or copies data out of anything else.
 <td width="50%"><img src="./docs/markets.png" alt="Markets" /><p align="center"><sub>Markets heatmap</sub></p></td>
 </tr>
 </table>
+
+## Feature parity
+
+How RobinView stacks up against TradingView on the features it sets out to cover:
+
+| Feature | RobinView | TradingView |
+|---------|-----------|-------------|
+| Advanced charts (types, scales, replay, export) | ✅ | ✅ |
+| Indicators (overlays + oscillators) | ✅ 12 built-in | ✅ thousands |
+| Drawing tools (edit handles, measure, layers) | ✅ | ✅ |
+| Watchlists | ✅ | ✅ |
+| Market heatmap / movers | ✅ | ✅ |
+| Screener | ✅ | ✅ |
+| Symbol fundamentals | ✅ | ✅ |
+| News | ✅ | ✅ |
+| Price alerts | ✅ browser notifications | ✅ |
+| Command palette | ✅ ⌘K | ✅ |
+| Real portfolio / trading | ✅ via Robinhood MCP | partial (broker integrations) |
+| Live quotes | ✅ | ✅ |
+
+> **Honest scope note.** RobinView deliberately leaves out the parts of TradingView that
+> depend on paid market data — tick-level / Level-2 order books, options chains, and real-time
+> futures — because they can't be served from free, keyless feeds. Everything here runs on
+> **only free keyless market data (Yahoo Finance)** plus **your own Robinhood MCP connection**
+> for account data. No paid data vendor, no scraping another app, no copied credentials.
 
 ## Quick start
 

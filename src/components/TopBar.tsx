@@ -3,6 +3,7 @@ import { useFlash } from "../hooks/useTrails";
 import { ChangePill } from "./common/bits";
 import { IconSearch } from "./common/icons";
 import { ConnectControl, Feather } from "./ConnectRobinhood";
+import { MarketClock } from "./common/MarketClock";
 import { price as fmtPrice, signedMoney, dirClass } from "../lib/format";
 
 export function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
@@ -42,6 +43,7 @@ export function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
       </div>
 
       <div className="topbar-right">
+        <MarketClock />
         {(rh.connected || mode === "demo") && accounts.length > 0 && (
           <select className="acct-select" value={account} onChange={(e) => setAccount(e.target.value)}>
             {accounts.map((a) => (
