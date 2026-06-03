@@ -1,0 +1,70 @@
+/* ============================================================
+   RobinView — "Midnight Trading Desk" design tokens
+   A premium dark financial terminal. Editorial serif headlines,
+   tabular-mono data, signal-emerald / warm-coral semantics.
+   ============================================================ */
+:root {
+  /* — Surfaces (warm near-black, layered) — */
+  --bg-base: #0a0c0b;
+  --bg-sunken: #070908;
+  --surface-1: #0f1311;
+  --surface-2: #141916;
+  --surface-3: #1a201c;
+  --surface-hover: #1f2622;
+  --overlay: rgba(6, 8, 7, 0.72);
+
+  /* — Hairlines & borders — */
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --line-faint: rgba(255, 255, 255, 0.04);
+
+  /* — Text — */
+  --text-1: #eef2ee;
+  --text-2: #9aa39c;
+  --text-3: #69716b;
+  --text-4: #474d49;
+
+  /* — Semantic market colors (tuned, not slop red/green) — */
+  --up: #34e29b;
+  --up-dim: #1e7a56;
+  --up-glow: rgba(52, 226, 155, 0.16);
+  --up-wash: rgba(52, 226, 155, 0.08);
+  --down: #ff6a57;
+  --down-dim: #9c3d33;
+  --down-glow: rgba(255, 106, 87, 0.16);
+  --down-wash: rgba(255, 106, 87, 0.08);
+  --flat: #8a938c;
+
+  /* — Brass accent (logo, premium highlights) — */
+  --brass: #e3b766;
+  --brass-dim: #8a6f3c;
+  --brass-glow: rgba(227, 183, 102, 0.16);
+
+  /* — Accent (interactive focus, links) — */
+  --accent: #6fe3c4;
+  --accent-soft: rgba(111, 227, 196, 0.12);
+
+  /* — Typography — */
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-ui: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+
+  /* — Radii — */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+
+  /* — Shadows / glows — */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 24px 70px -12px rgba(0, 0, 0, 0.7);
+
+  /* — Motion — */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur: 0.22s;
+
+  --sidebar-w: 60px;
+  --topbar-h: 56px;
+}

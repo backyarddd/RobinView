@@ -1,0 +1,1 @@
+{"root":["./server/index.ts","./server/provider/index.ts","./server/provider/market.ts","./server/provider/mcp.ts","./server/provider/mock.ts","./server/provider/types.ts","./server/provider/universe.ts","./shared/types.ts","./vite.config.ts"],"version":"5.9.3"}

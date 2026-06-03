@@ -1,0 +1,43 @@
+{
+  "name": "robinview",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "RobinView — a TradingView-class terminal for your Robinhood portfolio. Live charts, indicators, watchlists and real-time PnL.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k -n web,api -c green,cyan \"vite\" \"npm:dev:server\"",
+    "dev:server": "tsx watch server/index.ts",
+    "server": "tsx server/index.ts",
+    "start": "tsx server/index.ts",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "lightweight-charts": "^4.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ws": "^8.18.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}
