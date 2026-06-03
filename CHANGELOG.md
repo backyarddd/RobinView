@@ -4,6 +4,21 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.2]
+
+### Changed
+
+- The trade ticket no longer blocks orders when the selected account is not agentic-enabled.
+  It now routes the order through your agentic account instead, with a clear notice naming that
+  account, shows that account's buying power, and confirms the routing on the review screen. If no
+  agentic account is connected at all, it explains that rather than failing silently.
+
+### Notes
+
+- Equity orders are always funded from the account's buying power (cash plus any margin). Robinhood
+  does not expose a per-order payment method or funding source for stock orders, so there is no
+  payment-method picker; deposits/transfers fund the account separately in Robinhood.
+
 ## [0.2.1]
 
 ### Fixed

@@ -1587,6 +1587,16 @@
   border: 1px solid var(--brass-dim);
   border-radius: var(--r-sm);
 }
+.tt-note {
+  margin: 12px 18px 0;
+  padding: 9px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
 .tt-body {
   padding: 16px 18px 18px;
 }

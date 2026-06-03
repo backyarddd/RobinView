@@ -47,7 +47,19 @@ function Ticket({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const acct = accounts.find((a) => a.accountNumber === account);
-  const canTrade = mode === "demo" || !!acct?.agenticAllowed;
+  // Robinhood only places orders on an agentic-enabled account. If the selected
+  // account isn't one, route through the agentic account (preferring the default)
+  // instead of blocking the order.
+  const agenticAcct =
+    accounts.find((a) => a.agenticAllowed && a.isDefault) ?? accounts.find((a) => a.agenticAllowed);
+  const selectedIsAgentic = mode === "demo" || !!acct?.agenticAllowed;
+  // The account the order will actually be reviewed and placed against.
+  const orderAccount = mode === "demo" || acct?.agenticAllowed ? account : agenticAcct?.accountNumber ?? "";
+  // True when we're routing to a different (agentic) account than the selected one.
+  const routing = mode !== "demo" && !!acct && !acct.agenticAllowed && !!agenticAcct;
+  const canTrade = mode === "demo" || !!orderAccount;
+  const acctLabel = (a: { nickname?: string; brokerageAccountType: string; accountNumber: string }) =>
+    `${a.nickname || a.brokerageAccountType.replace(/_/g, " ")} ${a.accountNumber.length > 4 ? `••${a.accountNumber.slice(-4)}` : a.accountNumber}`;
   const held = position?.quantity ?? 0;
   const usesLimit = type === "limit" || type === "stop_limit";
   const usesStop = type === "stop_market" || type === "stop_limit";
@@ -65,6 +77,25 @@ function Ticket({ onClose }: { onClose: () => void }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // When routing to a different account, the store's portfolio (for the selected
+  // account) would show the wrong buying power, so fetch the order account's.
+  const [routedBP, setRoutedBP] = useState<number | null>(null);
+  useEffect(() => {
+    if (!routing || !orderAccount) {
+      setRoutedBP(null);
+      return;
+    }
+    let alive = true;
+    api
+      .portfolio(orderAccount)
+      .then((p) => alive && setRoutedBP(p.buyingPower))
+      .catch(() => alive && setRoutedBP(null));
+    return () => {
+      alive = false;
+    };
+  }, [routing, orderAccount]);
+  const buyingPower = routing ? routedBP : portfolio?.buyingPower ?? null;
 
   const req = useMemo((): OrderRequest | null => {
     const base = { symbol: ticket.symbol, side, type, timeInForce: tif, marketHours: hours };
@@ -93,7 +124,7 @@ function Ticket({ onClose }: { onClose: () => void }) {
     setError(null);
     setPhase("reviewing");
     try {
-      const r = await api.reviewOrder(account, req);
+      const r = await api.reviewOrder(orderAccount, req);
       setReview(r);
       setPhase("review");
     } catch (e: any) {
@@ -107,7 +138,7 @@ function Ticket({ onClose }: { onClose: () => void }) {
     setError(null);
     setPhase("placing");
     try {
-      const r = await api.placeOrder(account, req);
+      const r = await api.placeOrder(orderAccount, req);
       setResult(r);
       setPhase("done");
       refreshAccount();
@@ -140,11 +171,18 @@ function Ticket({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {!canTrade && (
+        {mode !== "demo" && !acct && (
+          <div className="tt-warn">Connect Robinhood to place live orders.</div>
+        )}
+        {routing && agenticAcct && (
+          <div className="tt-note">
+            {acct ? acctLabel(acct) : "This account"} can't place orders, so RobinView will route
+            this {side} through your agentic account ({acctLabel(agenticAcct)}).
+          </div>
+        )}
+        {mode !== "demo" && acct && !acct.agenticAllowed && !agenticAcct && (
           <div className="tt-warn">
-            {acct
-              ? "This account isn't enabled for agentic trading, so RobinView can't place orders on it."
-              : "Connect Robinhood to place live orders."}
+            No agentic account is connected. Open a Robinhood agentic account to place orders.
           </div>
         )}
 
@@ -279,10 +317,10 @@ function Ticket({ onClose }: { onClose: () => void }) {
               <span className="k">Est. {buy ? "cost" : "credit"}</span>
               <span className="v mono">{estCost > 0 ? money(estCost) : "—"}</span>
             </div>
-            {portfolio && (
+            {buyingPower != null && (
               <div className="tt-est sub">
-                <span className="k">Buying power</span>
-                <span className="v mono">{money(portfolio.buyingPower)}</span>
+                <span className="k">Buying power{routing ? " (agentic acct)" : ""}</span>
+                <span className="v mono">{money(buyingPower)}</span>
               </div>
             )}
 
@@ -318,7 +356,13 @@ function Ticket({ onClose }: { onClose: () => void }) {
               )}
               {review.buyingPower != null && <Row k="Buying power" v={money(review.buyingPower)} />}
               <Row k="Time in force" v={tif === "gfd" ? "Good for day" : "Good till cancelled"} />
+              {routing && agenticAcct && <Row k="Account" v={acctLabel(agenticAcct)} />}
             </div>
+            {routing && agenticAcct && (
+              <div className="tt-note" style={{ margin: "0 0 4px" }}>
+                Routing through your agentic account ({acctLabel(agenticAcct)}).
+              </div>
+            )}
 
             {review.alerts.length > 0 && (
               <div className="tt-alerts">
