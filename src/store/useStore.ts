@@ -11,6 +11,7 @@ import type {
   UpdateInfo,
 } from "@shared/types";
 import { api } from "../lib/api";
+import { VIEW_PATHS, SYMBOL_PATH_RE } from "../lib/constants";
 
 // What the trade ticket opens with. qty pre-fills the shares field (e.g. "close
 // position" passes the full holding); when absent the ticket starts empty.
@@ -166,6 +167,20 @@ function commitLists(
   persistLists(lists, activeId);
 }
 
+// Initial symbol from the URL (e.g. /SPY) so a refresh stays on the same ticker.
+// AppShell keeps the path in sync from then on.
+function initialSymbol(): string {
+  try {
+    const seg = decodeURIComponent(location.pathname.split("/")[1] || "");
+    if (seg && !(VIEW_PATHS as readonly string[]).includes(seg.toLowerCase()) && SYMBOL_PATH_RE.test(seg)) {
+      return seg.toUpperCase();
+    }
+  } catch {
+    /* malformed URI - fall through to the default */
+  }
+  return "NVDA";
+}
+
 const _wl = loadWatchlists();
 
 let ws: WebSocket | null = null;
@@ -186,7 +201,7 @@ export const useStore = create<StoreState>((set, get) => ({
   activeListId: _wl.activeId,
   watchlist: _wl.lists.find((l) => l.id === _wl.activeId)?.symbols ?? _wl.lists[0]?.symbols ?? [],
   alerts: load<Alert[]>(ALERTS_KEY, []),
-  selected: "NVDA",
+  selected: initialSymbol(),
   equityTrail: [],
   ticket: null,
   lastError: null,

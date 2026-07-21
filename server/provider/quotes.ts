@@ -64,6 +64,15 @@ function orderBy(order: string[], quotes: Quote[]): Quote[] {
   return order.map((s) => map.get(s)).filter(Boolean) as Quote[];
 }
 
+// Mini-chart series: cap the points sent per quote (the UI draws ~56px wide).
+const SPARK_POINTS = 40;
+function downsample(xs: number[], n: number): number[] {
+  if (xs.length <= n) return xs;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(xs[Math.floor((i * (xs.length - 1)) / (n - 1))]);
+  return out;
+}
+
 function sparkToQuote(e: any): Quote | null {
   const symbol = String(e.symbol || "").toUpperCase();
   if (!symbol) return null;
@@ -98,6 +107,9 @@ function sparkToQuote(e: any): Quote | null {
     extendedHours: false,
     state: "active",
     updatedAt: Date.now(),
+    // Today's close series (downsampled) so mini charts show the real intraday
+    // shape instead of accumulating ticks from page load.
+    spark: closesRaw.length > 1 ? downsample(closesRaw, SPARK_POINTS).map(round2) : undefined,
   };
 }
 

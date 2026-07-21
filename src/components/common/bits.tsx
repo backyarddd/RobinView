@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { percent, dirClass } from "../../lib/format";
 import { CompanyLogo } from "./CompanyLogo";
 
@@ -13,6 +14,10 @@ export function Sparkline({
   height?: number;
   color?: string;
 }) {
+  // Per-instance gradient id: data-derived ids collide across rows, and SVG
+  // resolves duplicates to the FIRST one in the DOM - a red line could get
+  // another row's green fill.
+  const id = useId();
   if (data.length < 2) return <svg width={width} height={height} />;
   const min = Math.min(...data);
   const max = Math.max(...data);
@@ -23,7 +28,6 @@ export function Sparkline({
     const y = height - 2 - ((v - min) / range) * (height - 4);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
-  const id = `sg-${Math.round(min * 1000)}-${data.length}`;
   return (
     <svg width={width} height={height} style={{ display: "block" }}>
       <defs>

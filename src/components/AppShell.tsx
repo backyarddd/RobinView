@@ -16,6 +16,7 @@ import { SettingsModal } from "./SettingsModal";
 import { UpdateBanner } from "./UpdateBanner";
 import { APP_VERSION } from "../lib/version";
 import { TradeTicket } from "./trade/TradeTicket";
+import { VIEW_PATHS } from "../lib/constants";
 import { TerminalView } from "./views/TerminalView";
 import { PortfolioView } from "./views/PortfolioView";
 import { MarketsView } from "./views/MarketsView";
@@ -35,16 +36,30 @@ const NAV: { id: View; label: string; icon: (p: { size?: number }) => JSX.Elemen
 ];
 
 export function AppShell() {
-  const [view, setView] = useState<View>("terminal");
+  // Initial view from the URL: /portfolio etc. selects that view; any other
+  // path (e.g. /SPY, parsed by the store into `selected`) means the terminal.
+  const [view, setView] = useState<View>(() => {
+    const seg = location.pathname.split("/")[1]?.toLowerCase() || "";
+    return (VIEW_PATHS as readonly string[]).includes(seg) ? (seg as View) : "terminal";
+  });
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [settings, setSettings] = useState(false);
   const init = useStore((s) => s.init);
   const alerts = useStore((s) => s.alerts);
   const select = useStore((s) => s.select);
+  const selected = useStore((s) => s.selected);
   const checkUpdate = useStore((s) => s.checkUpdate);
   const hasUpdate = useStore((s) => !!s.update.info?.hasUpdate);
   const activeAlerts = alerts.filter((a) => !a.triggered).length;
+
+  // Mirror the current place into the URL (terminal -> /SPY, others -> /orders)
+  // so a refresh or a shared link lands exactly where you were. replaceState
+  // keeps history clean (no entry per watchlist click).
+  useEffect(() => {
+    const path = view === "terminal" ? `/${encodeURIComponent(selected)}` : `/${view}`;
+    if (location.pathname !== path) history.replaceState(null, "", path);
+  }, [view, selected]);
 
   // Select a symbol and jump to the Terminal (the only view that hosts the chart).
   const openSymbol = (s: string) => {

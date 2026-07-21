@@ -94,19 +94,20 @@ interface Legend {
   up: boolean;
 }
 
-// lightweight-charts formats UTCTimestamps in UTC by default, so we mirror that
-// (timeZone: "UTC") and only flip the hour cycle. This keeps the displayed clock
-// values identical to before and just honors the user's 12h/24h preference.
+// Candle timestamps are true epoch seconds, so the axis + crosshair format them
+// in the viewer's local timezone (lightweight-charts' own labels default to UTC,
+// which read as "wrong" times - e.g. a 9:30 AM ET open shown as 1:30 PM).
 function lwcDate(t: unknown): Date {
   if (typeof t === "number") return new Date(t * 1000);
+  // Business-day objects are dateless calendar days - construct as a local date
+  // so local formatting can't shift them to the previous day.
   const b = t as { year: number; month: number; day: number };
-  return new Date(Date.UTC(b.year, (b.month || 1) - 1, b.day || 1));
+  return new Date(b.year, (b.month || 1) - 1, b.day || 1);
 }
 function makeLocalization(hour12: boolean) {
   return {
     timeFormatter: (t: unknown) =>
       lwcDate(t).toLocaleString("en-US", {
-        timeZone: "UTC",
         month: "short",
         day: "numeric",
         hour: hour12 ? "numeric" : "2-digit",
@@ -119,12 +120,11 @@ function makeLocalization(hour12: boolean) {
 function makeTickFormatter(hour12: boolean) {
   return (t: unknown, tickMarkType: number): string => {
     const d = lwcDate(t);
-    if (tickMarkType === 0) return d.toLocaleDateString("en-US", { timeZone: "UTC", year: "numeric" });
-    if (tickMarkType === 1) return d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short" });
-    if (tickMarkType === 2) return d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+    if (tickMarkType === 0) return d.toLocaleDateString("en-US", { year: "numeric" });
+    if (tickMarkType === 1) return d.toLocaleDateString("en-US", { month: "short" });
+    if (tickMarkType === 2) return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const secs = tickMarkType === 4 ? { second: "2-digit" as const } : {};
     return d.toLocaleTimeString("en-US", {
-      timeZone: "UTC",
       hour: hour12 ? "numeric" : "2-digit",
       minute: "2-digit",
       ...secs,
@@ -196,6 +196,9 @@ export function TradingChart({ symbol, onOpenSearch }: { symbol: string; onOpenS
   const [params, setParams] = useState<IndicatorParams>(loadParams);
   const [legend, setLegend] = useState<Legend | null>(null);
   const [loading, setLoading] = useState(true);
+  // True when the server fell back to generated candles (Yahoo unavailable) -
+  // surfaced as a badge so simulated data is never mistaken for real history.
+  const [synthetic, setSynthetic] = useState(false);
   const [replay, setReplay] = useState(false);
   const [replayIdx, setReplayIdx] = useState(0);
   const [replayPlaying, setReplayPlaying] = useState(false);
@@ -405,6 +408,7 @@ export function TradingChart({ symbol, onOpenSearch }: { symbol: string; onOpenS
       .then((series) => {
         if (!alive) return;
         candlesRef.current = series.candles;
+        setSynthetic(!!series.synthetic);
         // Publish the period baseline (open of the first bar in the window) so
         // the top bar can show the % / $ change across this exact timeframe.
         const first = series.candles[0];
@@ -425,6 +429,43 @@ export function TradingChart({ symbol, onOpenSearch }: { symbol: string; onOpenS
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, tf]);
+
+  // ---- background refresh: keep the series current while the chart is open ----
+  // Live ticks only mutate the LAST bar, so without a refetch a chart left open
+  // never gains new bars - hours of movement pile into one candle. Poll the
+  // candles endpoint on a per-timeframe cadence and re-apply silently (no
+  // loading flash, no fitContent, so the user's zoom/scroll is preserved).
+  // applyData/redrawAllOsc are read through refs so the interval always uses the
+  // current indicator/param state without re-arming on every change.
+  const applyDataRef = useRef<() => void>(() => {});
+  const redrawAllOscRef = useRef<(fit?: boolean) => void>(() => {});
+  useEffect(() => {
+    const REFRESH_MS: Record<Timeframe, number> = {
+      "1D": 30_000,
+      "1W": 60_000,
+      "1M": 5 * 60_000,
+      "3M": 30 * 60_000,
+      "1Y": 60 * 60_000,
+      "5Y": 6 * 60 * 60_000,
+      ALL: 12 * 60 * 60_000,
+    };
+    if (replay) return; // never mutate the series mid-replay
+    const id = setInterval(() => {
+      api
+        .candles(symbol, tf)
+        .then((series) => {
+          if (!series.candles.length) return;
+          candlesRef.current = series.candles;
+          setSynthetic(!!series.synthetic);
+          const first = series.candles[0];
+          if (first) useStore.getState().setPeriodStart({ symbol, tf, price: first.open || first.close });
+          applyDataRef.current();
+          redrawAllOscRef.current(false);
+        })
+        .catch(() => {});
+    }, REFRESH_MS[tf]);
+    return () => clearInterval(id);
+  }, [symbol, tf, replay]);
 
   // rebuild main series on type change, keep data
   useEffect(() => {
@@ -640,10 +681,13 @@ export function TradingChart({ symbol, onOpenSearch }: { symbol: string; onOpenS
   }
 
   // Redraw the series of all active oscillator panes (used on symbol/tf/replay/
-  // params change).
-  function redrawAllOsc() {
-    for (const key of oscCharts.current.keys()) drawOsc(key);
+  // params change). fit=false skips fitContent so background refreshes don't
+  // yank the user's zoom (osc fitContent syncs back to the main chart).
+  function redrawAllOsc(fit = true) {
+    for (const key of oscCharts.current.keys()) drawOsc(key, fit);
   }
+  applyDataRef.current = applyData;
+  redrawAllOscRef.current = redrawAllOsc;
 
   useEffect(() => {
     redrawAllOsc();
@@ -653,7 +697,7 @@ export function TradingChart({ symbol, onOpenSearch }: { symbol: string; onOpenS
   // Draw a single oscillator's series into its own pane chart, replacing any
   // existing series for that key. Series construction is identical to the prior
   // single-pane code, just parameterized by `key`.
-  function drawOsc(key: IndicatorKey) {
+  function drawOsc(key: IndicatorKey, fit = true) {
     const chart = oscCharts.current.get(key);
     const cs = visible();
     if (!chart || !cs.length) return;
@@ -704,7 +748,7 @@ export function TradingChart({ symbol, onOpenSearch }: { symbol: string; onOpenS
         cfg.bands?.forEach(([p, col]) => band(p, col));
       }
     }
-    chart.timeScale().fitContent();
+    if (fit) chart.timeScale().fitContent();
   }
 
   // Recompute only the oscillator's last point(s) from the live-adjusted last bar
@@ -1288,6 +1332,23 @@ export function TradingChart({ symbol, onOpenSearch }: { symbol: string; onOpenS
             <span className="dim" style={{ fontFamily: "var(--font-mono)", fontWeight: 400 }}>
               {tf} · {type}
             </span>
+            {synthetic && (
+              <span
+                className="mono"
+                title="Live history is unavailable; this series is generated, not real market data."
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: "#e3b766",
+                  border: "1px solid rgba(227,183,102,0.45)",
+                  borderRadius: 4,
+                  padding: "1px 6px",
+                  letterSpacing: 0.5,
+                }}
+              >
+                SIMULATED
+              </span>
+            )}
           </div>
           <div className="cmp-row">
             {compareSymbols.map(({ sym, color }) => (

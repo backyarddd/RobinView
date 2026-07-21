@@ -1,3 +1,10 @@
+// URL paths reserved for app views; any other /SEGMENT is treated as a ticker
+// (terminal view). "terminal" itself is represented by the symbol path (/SPY).
+export const VIEW_PATHS = ["portfolio", "markets", "screener", "orders", "alerts"] as const;
+
+// Path segments that look like a ticker (incl. crypto pairs like BTC-USD).
+export const SYMBOL_PATH_RE = /^[A-Za-z0-9.\-^=]{1,15}$/;
+
 // Symbols surfaced in the Markets view heatmap & movers.
 export const MARKET_SYMBOLS = [
   "NVDA", "AAPL", "MSFT", "GOOGL", "AMZN", "META", "TSLA", "AVGO",

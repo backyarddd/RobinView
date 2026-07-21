@@ -66,6 +66,7 @@ export interface Quote {
   extendedHours: boolean;
   state: "active" | "closed" | "pre" | "post";
   updatedAt: number; // epoch ms
+  spark?: number[]; // downsampled intraday close series (today) for mini charts
 }
 
 export type Candle = {
@@ -85,6 +86,7 @@ export interface CandleSeries {
   timeframe: Timeframe;
   interval: Interval;
   candles: Candle[];
+  synthetic?: boolean; // true when candles are generated (live history unavailable)
 }
 
 export interface OrderRow {

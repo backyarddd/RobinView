@@ -97,7 +97,9 @@ export function Watchlist({ onAdd, flush = false }: { onAdd: () => void; flush?:
         )}
         {watchlist.map((sym) => {
           const q = quotes[sym];
-          const trail = trails[sym] ?? [];
+          // Real intraday close series from the quote feed; the live tick trail
+          // is only a fallback for symbols whose quote has no spark data.
+          const spark = q?.spark && q.spark.length > 1 ? q.spark : (trails[sym] ?? []);
           return (
             <div
               key={sym}
@@ -113,8 +115,8 @@ export function Watchlist({ onAdd, flush = false }: { onAdd: () => void; flush?:
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div className="wl-spark">
-                  {trail.length > 1 ? (
-                    <Sparkline data={trail} />
+                  {spark.length > 1 ? (
+                    <Sparkline data={spark} />
                   ) : (
                     <div className="skel" style={{ width: 56, height: 22 }} />
                   )}

@@ -4,6 +4,33 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0]
+
+### Added
+
+- **URL routing.** The address bar now reflects where you are: `/SPY` opens the terminal on that
+  symbol (crypto pairs like `/BTC-USD` work too), and `/portfolio`, `/markets`, `/screener`,
+  `/orders`, `/alerts` open those views. The URL stays in sync as you navigate, so a refresh or a
+  shared link lands exactly where you were.
+- **Real intraday sparklines.** Watchlist mini charts now draw today's actual close series
+  (downsampled server-side from Yahoo spark data) instead of accumulating live ticks from page
+  load, so the shape is correct the moment the list renders. The tick trail remains as a fallback
+  for symbols without spark data.
+- **SIMULATED badge.** When live history is unavailable and the server falls back to generated
+  candles, the chart header shows a SIMULATED badge so synthetic data is never mistaken for real
+  market history.
+- **Background chart refresh.** An open chart re-fetches its series on a per-timeframe cadence
+  (30s on 1D, scaling up for longer windows), so new bars appear without a reload. The refresh is
+  silent: no loading flash, and your zoom / scroll position is preserved.
+
+### Fixed
+
+- **Chart times are now local.** The time axis and crosshair format timestamps in your local
+  timezone instead of UTC (a 9:30 AM ET open no longer displays as 1:30 PM). Daily+ bars still
+  render as calendar days, constructed locally so they cannot shift to the previous day.
+- Sparkline gradient ids are now unique per instance; previously two rows with similar data could
+  collide and one row's line could pick up another row's fill color.
+
 ## [0.3.1]
 
 ### Fixed

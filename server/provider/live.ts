@@ -59,11 +59,18 @@ export class LiveProvider implements DataProvider {
     const interval = intervalFor(timeframe);
     const real = await fetchHistory(sym, timeframe);
     if (real) return { symbol: sym, timeframe, interval, candles: real };
-    // offline fallback: anchor a synthetic series to the last live quote
+    // offline fallback: anchor a synthetic series to the last live quote, and
+    // say so - the client shows a SIMULATED badge instead of passing it off as real.
     const [q] = await fetchQuotes([sym]);
     const price = q?.price ?? 100;
     const prev = q?.previousClose ?? price;
-    return { symbol: sym, timeframe, interval, candles: genCandles(sym, price, prev, timeframe, Math.floor(Date.now() / 1000)) };
+    return {
+      symbol: sym,
+      timeframe,
+      interval,
+      candles: genCandles(sym, price, prev, timeframe, Math.floor(Date.now() / 1000)),
+      synthetic: true,
+    };
   }
 
   async search(query: string): Promise<SearchResult[]> {
