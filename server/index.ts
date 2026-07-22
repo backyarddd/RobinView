@@ -13,6 +13,7 @@ import { checkForUpdate, applyUpdate } from "./provider/updates.js";
 import { fetchSymbolDetail } from "./provider/detail.js";
 import { fetchOptions } from "./provider/options.js";
 import { resolveDomain } from "./provider/logo.js";
+import { getState as getPaperState, onSignal as onPaperSignal, tick as paperTick, startPaperLoop } from "./paper/engine.js";
 import type { WsClientMessage, WsMessage } from "../shared/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -115,6 +116,19 @@ app.get("/api/logo/:symbol", (req, res) => {
     })
     .catch(() => res.status(404).end());
 });
+
+// ── Paper 0DTE experiment (simulated fills only; never places real orders) ──
+app.get("/api/paper/state", (_req, res) => ok(res, async () => getPaperState()));
+app.post("/api/paper/signal", (req, res) =>
+  ok(res, () => {
+    const { direction, confidence, thesis } = req.body ?? {};
+    if (!["call", "put", "none"].includes(direction)) throw new Error("direction must be call|put|none");
+    const conf = Number(confidence);
+    if (!Number.isFinite(conf) || conf < 0 || conf > 1) throw new Error("confidence must be 0..1");
+    return onPaperSignal(direction, conf, String(thesis ?? "").slice(0, 2000));
+  }),
+);
+app.post("/api/paper/tick", (_req, res) => ok(res, () => paperTick().then(() => getPaperState())));
 
 // ── Self-update (checks / applies the latest from the GitHub repo) ──────────
 app.get("/api/version", (req, res) =>
@@ -294,4 +308,5 @@ httpServer.listen(PORT, async () => {
     const resumed = await live.resumeRobinhood().catch(() => false);
     console.log(`  ● Robinhood: ${resumed ? "session resumed" : "not connected (connect in the app)"}\n`);
   }
+  startPaperLoop();
 });

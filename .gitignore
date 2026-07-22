@@ -17,3 +17,4 @@ coverage
 
 # Local working notes (not for the repo)
 HANDOFF.md
+server/paper/state.json

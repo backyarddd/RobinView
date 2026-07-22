@@ -4,6 +4,22 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0]
+
+### Added
+
+- **0DTE Paper experiment.** A fully simulated agentic day-trading loop: a cron-driven research
+  tick (hourly, 9:45-14:00 ET weekdays) has Claude analyze SPY, VIX, recent candles, and live
+  headlines, then emit a directional signal (call / put / none with confidence and thesis). The
+  server-side paper engine buys the nearest-the-money same-day SPY contract with honest fills
+  (enter at the ask, exit at the bid, marked at the bid) using real Yahoo option-chain quotes.
+  Hard-coded risk rules: $500 premium budget per trade, 60% minimum confidence, one position at
+  a time, max 3 trades/day, -50% stop / +100% target, forced flat by 15:45 ET, and a -$300 daily
+  loss halt. A new "0DTE Paper" view shows equity, win rate, the trade log with each trade's
+  thesis, and every research signal (including skipped ones and why). NO REAL ORDERS: nothing in
+  this module touches order endpoints; the promotion bar before any live dollar is 60+ trades,
+  net positive after spreads, drawdown under 30%.
+
 ## [0.4.0]
 
 ### Added

@@ -318,3 +318,48 @@ export type WsClientMessage =
   | { type: "subscribe"; symbols: string[] }
   | { type: "unsubscribe"; symbols: string[] }
   | { type: "setAccount"; account: string };
+
+// ---- Paper 0DTE experiment (no real orders ever leave this module) ----
+
+export interface PaperSignal {
+  at: number; // epoch ms
+  direction: "call" | "put" | "none";
+  confidence: number; // 0..1
+  thesis: string;
+  action: string; // "entered" or "skipped: <reason>"
+}
+
+export interface PaperTrade {
+  id: string;
+  side: "call" | "put";
+  strike: number;
+  expiry: string; // YYYY-MM-DD (ET)
+  contract: string; // e.g. "SPY 630C 0DTE"
+  qty: number;
+  entryPrice: number; // per-share premium paid (filled at the ask)
+  entryAt: number;
+  entrySpot: number;
+  thesis: string;
+  confidence: number;
+  mark?: number; // latest bid while open (liquidation value)
+  exitPrice?: number; // per-share premium received (filled at the bid)
+  exitAt?: number;
+  exitSpot?: number;
+  exitReason?: "stop" | "target" | "eod" | "expired";
+  pnl?: number; // realized $, qty * 100 * (exit - entry)
+}
+
+export interface PaperState {
+  seed: number;
+  cash: number;
+  realized: number;
+  open: PaperTrade | null;
+  trades: PaperTrade[]; // closed, newest first
+  signals: PaperSignal[]; // newest first
+  equityHist: { t: number; v: number }[];
+  day: string; // ET date the daily counters refer to
+  dayTrades: number;
+  dayPnl: number;
+  halted: string | null; // set when the daily loss halt trips
+  updatedAt: number;
+}

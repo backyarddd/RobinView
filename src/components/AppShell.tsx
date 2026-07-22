@@ -9,6 +9,7 @@ import {
   IconBell,
   IconGear,
   IconFunnel,
+  IconCandle,
 } from "./common/icons";
 import { CommandPalette } from "./CommandPalette";
 import { ShortcutsHelp } from "./ShortcutsHelp";
@@ -18,13 +19,14 @@ import { APP_VERSION } from "../lib/version";
 import { TradeTicket } from "./trade/TradeTicket";
 import { VIEW_PATHS } from "../lib/constants";
 import { TerminalView } from "./views/TerminalView";
+import { PaperView } from "./views/PaperView";
 import { PortfolioView } from "./views/PortfolioView";
 import { MarketsView } from "./views/MarketsView";
 import { OrdersView } from "./views/OrdersView";
 import { AlertsView } from "./views/AlertsView";
 import { ScreenerView } from "./views/ScreenerView";
 
-export type View = "terminal" | "portfolio" | "markets" | "screener" | "orders" | "alerts";
+export type View = "terminal" | "portfolio" | "markets" | "screener" | "orders" | "alerts" | "paper";
 
 const NAV: { id: View; label: string; icon: (p: { size?: number }) => JSX.Element }[] = [
   { id: "terminal", label: "Terminal", icon: IconTerminal },
@@ -33,6 +35,7 @@ const NAV: { id: View; label: string; icon: (p: { size?: number }) => JSX.Elemen
   { id: "screener", label: "Screener", icon: IconFunnel },
   { id: "orders", label: "Orders", icon: IconList },
   { id: "alerts", label: "Alerts", icon: IconBell },
+  { id: "paper", label: "0DTE Paper", icon: IconCandle },
 ];
 
 export function AppShell() {
@@ -162,6 +165,7 @@ export function AppShell() {
         {view === "screener" && <ScreenerView onOpenSymbol={openSymbol} />}
         {view === "orders" && <OrdersView />}
         {view === "alerts" && <AlertsView />}
+        {view === "paper" && <PaperView />}
       </main>
 
       <CommandPalette open={palette} onClose={() => setPalette(false)} onNavigate={setView} />
