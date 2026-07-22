@@ -13,7 +13,7 @@ import { checkForUpdate, applyUpdate } from "./provider/updates.js";
 import { fetchSymbolDetail } from "./provider/detail.js";
 import { fetchOptions } from "./provider/options.js";
 import { resolveDomain } from "./provider/logo.js";
-import { getState as getPaperState, onSignal as onPaperSignal, tick as paperTick, startPaperLoop } from "./paper/engine.js";
+import { getState as getPaperState, onSignal as onPaperSignal, tick as paperTick, addReview as addPaperReview, startPaperLoop } from "./paper/engine.js";
 import type { WsClientMessage, WsMessage } from "../shared/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -129,6 +129,14 @@ app.post("/api/paper/signal", (req, res) =>
   }),
 );
 app.post("/api/paper/tick", (_req, res) => ok(res, () => paperTick().then(() => getPaperState())));
+app.post("/api/paper/review", (req, res) =>
+  ok(res, async () => {
+    const { id, verdict, whatHappened, lesson } = req.body ?? {};
+    if (!id || !verdict || !whatHappened || !lesson) throw new Error("id, verdict, whatHappened, lesson required");
+    if (!addPaperReview(String(id), { verdict, whatHappened, lesson })) throw new Error("trade not found");
+    return { ok: true };
+  }),
+);
 
 // ── Self-update (checks / applies the latest from the GitHub repo) ──────────
 app.get("/api/version", (req, res) =>

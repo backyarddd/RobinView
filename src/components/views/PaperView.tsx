@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { PaperState, PaperTrade } from "@shared/types";
 import { Sparkline } from "../common/bits";
+import { ReviewChip } from "../panels/TradeLog";
 import { dirClass } from "../../lib/format";
 
 // Paper 0DTE experiment dashboard. Read-only view over the server-side paper
@@ -39,6 +40,7 @@ function TradeRow({ t }: { t: PaperTrade }) {
       <td className="mono">{open ? (t.mark != null ? `${t.mark.toFixed(2)} (mark)` : "…") : t.exitPrice!.toFixed(2)}</td>
       <td className="dim">{open ? "open" : t.exitReason}</td>
       <td className={`mono ${dirClass(pnl)}`}>{fmt$(pnl)}</td>
+      <td><ReviewChip t={t} /></td>
     </tr>
   );
 }
@@ -108,13 +110,30 @@ export function PaperView() {
             ) : (
               <table className="tbl" style={{ width: "100%" }}>
                 <thead>
-                  <tr><th>Entered</th><th>Contract</th><th>Qty</th><th>Entry</th><th>Exit</th><th>Reason</th><th>P&L</th></tr>
+                  <tr><th>Entered</th><th>Contract</th><th>Qty</th><th>Entry</th><th>Exit</th><th>Reason</th><th>P&L</th><th>Review</th></tr>
                 </thead>
                 <tbody>{rows.map((t) => <TradeRow key={t.id} t={t} />)}</tbody>
               </table>
             )}
           </div>
         </div>
+
+        {closed.some((t) => t.review) && (
+          <div className="panel" style={{ marginBottom: 16 }}>
+            <div className="panel-head">Lessons (fed back into every research tick)</div>
+            <div className="panel-body">
+              {closed
+                .filter((t) => t.review)
+                .slice(0, 15)
+                .map((t) => (
+                  <div key={t.id} style={{ padding: "6px 4px", display: "flex", gap: 10, alignItems: "baseline" }}>
+                    <span className={`mono ${dirClass(t.pnl ?? 0)}`} style={{ fontSize: 11, minWidth: 64, textAlign: "right" }}>{fmt$(t.pnl ?? 0)}</span>
+                    <span style={{ fontSize: 12 }}>{t.review!.lesson}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         <div className="panel">
           <div className="panel-head">Research signals</div>

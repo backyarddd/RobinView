@@ -19,6 +19,43 @@ const dur = (ms: number) => {
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`;
 };
 
+// Short human labels for review verdicts; unknown verdicts show as-is.
+const VERDICT_LABEL: Record<string, string> = {
+  thesis_right: "✓ thesis right",
+  thesis_wrong: "✗ thesis wrong",
+  right_but_stopped: "~ right, stopped out",
+  right_but_late: "~ right, too late",
+  chop_no_edge: "~ chop, no edge",
+  lucky_win: "◐ lucky win",
+  news_surprise: "! news surprise",
+};
+
+// Hoverable review chip: the tooltip carries the full post-mortem.
+export function ReviewChip({ t }: { t: PaperTrade }) {
+  if (t.exitAt == null) return <span className="dim">—</span>;
+  if (!t.review) return <span className="dim" style={{ fontSize: 11 }}>pending…</span>;
+  const good = (t.pnl ?? 0) > 0;
+  return (
+    <span
+      className="mono"
+      title={`WHAT HAPPENED\n${t.review.whatHappened}\n\nLESSON\n${t.review.lesson}`}
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "help",
+        color: good ? "var(--up)" : "var(--down)",
+        border: `1px solid ${good ? "var(--up)" : "var(--down)"}`,
+        opacity: 0.9,
+        borderRadius: 4,
+        padding: "1px 6px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {VERDICT_LABEL[t.review.verdict] ?? t.review.verdict}
+    </span>
+  );
+}
+
 function Summary({ items }: { items: { label: string; value: string; cls?: string }[] }) {
   return (
     <div style={{ display: "flex", gap: 24, padding: "6px 10px", flexWrap: "wrap" }}>
@@ -76,7 +113,7 @@ function PaperLog() {
         <thead>
           <tr>
             <th>Entered</th><th>Contract</th><th>Qty</th><th>Conf</th><th>Entry</th><th>Spot in</th>
-            <th>Exit</th><th>Spot out</th><th>Held</th><th>Reason</th><th>P&L</th><th>P&L %</th>
+            <th>Exit</th><th>Spot out</th><th>Held</th><th>Reason</th><th>P&L</th><th>P&L %</th><th>Review</th>
           </tr>
         </thead>
         <tbody>
@@ -100,12 +137,24 @@ function PaperLog() {
                   <td className="dim">{open ? "open" : t.exitReason}</td>
                   <td className={`mono ${pnl != null ? dirClass(pnl) : ""}`}>{pnl != null ? money(pnl) : "…"}</td>
                   <td className={`mono ${ret != null ? dirClass(ret) : ""}`}>{ret != null ? pct(ret) : "…"}</td>
+                  <td><ReviewChip t={t} /></td>
                 </tr>
                 {expanded === t.id && (
                   <tr>
-                    <td colSpan={12} className="dim" style={{ fontSize: 12, whiteSpace: "normal", padding: "4px 10px 10px" }}>
-                      <span className="mono" style={{ fontSize: 10, letterSpacing: 0.5 }}>THESIS · </span>
-                      {t.thesis}
+                    <td colSpan={13} className="dim" style={{ fontSize: 12, whiteSpace: "normal", padding: "4px 10px 10px" }}>
+                      <div><span className="mono" style={{ fontSize: 10, letterSpacing: 0.5 }}>THESIS · </span>{t.thesis}</div>
+                      {t.review && (
+                        <>
+                          <div style={{ marginTop: 4 }}>
+                            <span className="mono" style={{ fontSize: 10, letterSpacing: 0.5 }}>WHAT HAPPENED · </span>
+                            {t.review.whatHappened}
+                          </div>
+                          <div style={{ marginTop: 4 }}>
+                            <span className="mono" style={{ fontSize: 10, letterSpacing: 0.5 }}>LESSON · </span>
+                            {t.review.lesson}
+                          </div>
+                        </>
+                      )}
                     </td>
                   </tr>
                 )}

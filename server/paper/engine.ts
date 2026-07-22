@@ -212,6 +212,21 @@ export async function tick(): Promise<void> {
   persist();
 }
 
+// Attach a post-trade review to a closed trade (idempotent; latest wins).
+export function addReview(id: string, review: { verdict: string; whatHappened: string; lesson: string }): boolean {
+  const s = getState();
+  const t = s.trades.find((x) => x.id === id);
+  if (!t) return false;
+  t.review = {
+    verdict: String(review.verdict).slice(0, 60),
+    whatHappened: String(review.whatHappened).slice(0, 2000),
+    lesson: String(review.lesson).slice(0, 500),
+    at: Date.now(),
+  };
+  persist();
+  return true;
+}
+
 // Start the self-managing loop: mark/manage every 60s during ET market hours.
 export function startPaperLoop(): void {
   setInterval(() => {

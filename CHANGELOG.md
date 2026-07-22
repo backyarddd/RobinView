@@ -4,6 +4,19 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.0]
+
+### Added
+
+- **Post-trade reviews (the learning loop).** Every closed paper trade is automatically
+  investigated: a review sweep reconstructs what SPY actually did between entry and exit, has
+  Claude grade the thesis against reality (thesis_right / thesis_wrong / right_but_stopped /
+  chop_no_edge / lucky_win / ...), and attaches a 2-3 sentence "what happened" plus a one-line
+  actionable lesson. Hover the Review chip on any closed trade to read it; click the row for the
+  full thesis + post-mortem. The 0DTE Paper view gains a Lessons panel, and every research tick
+  now receives the track record (win rates by side, recent trades with their lessons) so future
+  signals learn from documented mistakes.
+
 ## [0.6.0]
 
 ### Added

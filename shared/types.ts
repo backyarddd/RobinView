@@ -347,6 +347,7 @@ export interface PaperTrade {
   exitSpot?: number;
   exitReason?: "stop" | "target" | "eod" | "expired";
   pnl?: number; // realized $, qty * 100 * (exit - entry)
+  review?: PaperReview;
 }
 
 export interface PaperState {
@@ -362,4 +363,13 @@ export interface PaperState {
   dayPnl: number;
   halted: string | null; // set when the daily loss halt trips
   updatedAt: number;
+}
+
+// Post-trade review: Claude's retrospective on a closed paper trade, comparing
+// the entry thesis against what the market actually did.
+export interface PaperReview {
+  verdict: string; // e.g. thesis_right, thesis_wrong, right_but_stopped, chop_no_edge
+  whatHappened: string; // prediction vs actual path, 2-3 sentences
+  lesson: string; // one actionable takeaway for future entries
+  at: number; // epoch ms
 }

@@ -24,3 +24,10 @@ if [ "$D" -le 5 ] && [ "$NOW" -ge 580 ] && [ "$NOW" -le 845 ]; then   # 9:40-14:
 else
   echo "$(date) skipped - outside ET entry window" >>/tmp/robinview-paper-cron.log
 fi
+
+# Review sweep: post-mortem any closed-but-unreviewed trades (cheap no-op when
+# there are none). Runs on every weekday tick so 15:45 closes get reviewed at
+# the next hour and their lessons are in the prompt by the next morning.
+if [ "$D" -le 5 ]; then
+  node scripts/paper-review.mjs >>/tmp/robinview-paper-cron.log 2>&1
+fi

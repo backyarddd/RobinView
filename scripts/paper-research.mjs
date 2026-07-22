@@ -23,11 +23,35 @@ function fmtQuote(q) {
   return `${q.price} (${q.changePct >= 0 ? "+" : ""}${q.changePct?.toFixed(2)}% today, day range ${q.dayLow}-${q.dayHigh}, prev close ${q.previousClose})`;
 }
 
+// Distill the paper book into a track record + lessons block so each research
+// tick learns from what already worked and what did not.
+function trackRecord(state) {
+  const closed = (state?.trades ?? []).filter((t) => t.exitAt != null);
+  if (!closed.length) return "";
+  const wins = closed.filter((t) => (t.pnl ?? 0) > 0).length;
+  const total = closed.reduce((a, t) => a + (t.pnl ?? 0), 0);
+  const bySide = (side) => {
+    const xs = closed.filter((t) => t.side === side);
+    return xs.length ? `${side}s: ${xs.filter((t) => (t.pnl ?? 0) > 0).length}/${xs.length} won, net $${xs.reduce((a, t) => a + (t.pnl ?? 0), 0).toFixed(0)}` : `${side}s: none`;
+  };
+  const recent = closed.slice(0, 10).map((t) => {
+    const line = `- ${t.side} ${t.strike} conf ${t.confidence} entered ${new Date(t.entryAt).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })} ET, exit ${t.exitReason}, P&L $${t.pnl}`;
+    return t.review ? `${line}\n  verdict: ${t.review.verdict}. lesson: ${t.review.lesson}` : line;
+  });
+  return `
+YOUR TRACK RECORD SO FAR (paper): ${closed.length} closed, ${wins} wins, net $${total.toFixed(0)}. ${bySide("call")}. ${bySide("put")}.
+Recent trades with post-mortem lessons:
+${recent.join("\n")}
+
+Apply these lessons. Do not repeat a documented mistake. If the record shows a setup keeps losing (e.g. chasing moves that already happened, trading chop), require visibly stronger evidence before signaling it again.`;
+}
+
 async function gatherContext() {
-  const [quotes, candles, news] = await Promise.all([
+  const [quotes, candles, news, paper] = await Promise.all([
     get("/api/quotes?symbols=SPY,%5EVIX,QQQ,DIA"),
     get("/api/candles/SPY?timeframe=3M"),
     get("/api/news/SPY").catch(() => []),
+    get("/api/paper/state").catch(() => null),
   ]);
   const bySym = Object.fromEntries(quotes.map((q) => [q.symbol, q]));
   const daily = candles.candles.slice(-6);
@@ -39,7 +63,7 @@ async function gatherContext() {
     .map((n) => `- ${n.title}${n.summary ? ` :: ${String(n.summary).slice(0, 200)}` : ""}`)
     .join("\n");
   const nowET = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
-  return { bySym, dailyLines, headlines, nowET };
+  return { bySym, dailyLines, headlines, nowET, record: trackRecord(paper) };
 }
 
 function buildPrompt(ctx) {
@@ -57,6 +81,7 @@ Latest headlines:
 ${ctx.headlines || "(none available)"}
 
 You may use WebSearch to check for macro events, Fed speakers, or major breaking news happening today before deciding.
+${ctx.record}
 
 Rules for your answer:
 - "call" = you expect SPY meaningfully higher by ~15:45 ET; "put" = meaningfully lower; "none" = no conviction either way. "none" is a respectable answer - most days have no exploitable intraday edge, and scheduled macro news is already priced in within seconds.
