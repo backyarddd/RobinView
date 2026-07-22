@@ -5,11 +5,12 @@ import { Watchlist } from "../panels/Watchlist";
 import { SymbolQuote } from "../panels/SymbolQuote";
 import { PositionsTable } from "../panels/PositionsTable";
 import { OrdersTable } from "../panels/OrdersTable";
+import { TradeLog } from "../panels/TradeLog";
 import { AlertsPanel } from "../panels/AlertsPanel";
 import { SymbolInfo } from "../panels/SymbolInfo";
 import { ConnectCard } from "../ConnectRobinhood";
 
-type Tab = "lists" | "positions" | "orders" | "alerts";
+type Tab = "lists" | "positions" | "orders" | "alerts" | "log";
 
 export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
   const symbol = useStore((s) => s.selected);
@@ -45,6 +46,9 @@ export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
             <button className={`tab ${tab === "alerts" ? "on" : ""}`} onClick={() => setTab("alerts")}>
               Alerts <span className="badge">{alerts.filter((a) => !a.triggered).length}</span>
             </button>
+            <button className={`tab ${tab === "log" ? "on" : ""}`} onClick={() => setTab("log")}>
+              Trade Log
+            </button>
           </div>
         </div>
         <div className="panel-body">
@@ -58,6 +62,7 @@ export function TerminalView({ onOpenSearch }: { onOpenSearch: () => void }) {
             </>
           )}
           {tab === "alerts" && <AlertsPanel />}
+          {tab === "log" && <TradeLog />}
         </div>
       </div>
     </div>

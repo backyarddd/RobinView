@@ -4,6 +4,21 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.6.0]
+
+### Added
+
+- **Trade Log tab** in the terminal's bottom panel (next to Watchlist / Positions / Orders /
+  Alerts), with a Paper / Real switch:
+  - **Paper (0DTE)**: every paper trade with full detail - entry/exit premium, spot at entry and
+    exit, confidence, holding time, exit reason, P&L in dollars and percent, plus summary stats
+    (net P&L, win rate, average win/loss, today's tally). Click a row to expand the trade's
+    written thesis.
+  - **Real (Robinhood)**: all filled orders for the selected account with FIFO-attributed
+    realized P&L - each sell is matched against the oldest visible buy lots to compute basis,
+    P&L, and return, with totals and win rate up top. Sells whose buys predate the visible
+    history are flagged instead of shown as $0.
+
 ## [0.5.0]
 
 ### Added
