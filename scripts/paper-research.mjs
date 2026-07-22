@@ -70,7 +70,9 @@ Reply with ONLY a JSON object, no markdown fences, no other text:
 function askClaude(prompt) {
   const out = execFileSync(
     "claude",
-    ["-p", prompt, "--output-format", "json", "--allowedTools", "WebSearch"],
+    // Pinned to a specific model so the experiment stays on one brain even if
+    // the CLI default changes mid-run.
+    ["-p", prompt, "--output-format", "json", "--model", "claude-sonnet-5", "--allowedTools", "WebSearch"],
     { encoding: "utf8", timeout: 5 * 60_000, maxBuffer: 10 * 1024 * 1024 },
   );
   const envelope = JSON.parse(out);
