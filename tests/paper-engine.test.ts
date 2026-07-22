@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entryBlock, exitReason, RULES, type EtClock } from "../server/paper/engine";
+import { entryBlock, exitReason, isForcedWindow, RULES, type EtClock } from "../server/paper/engine";
 import type { PaperState, PaperTrade } from "../shared/types";
 
 const clock = (minutes: number, weekday = 2, day = "2026-07-21"): EtClock => ({ day, minutes, weekday });
@@ -45,8 +45,21 @@ describe("paper engine entry gates", () => {
   it("blocks 'none' direction", () => {
     expect(entryBlock(state(), { direction: "none", confidence: 0.9 }, midday)).toMatch(/no directional/);
   });
-  it("blocks low confidence", () => {
-    expect(entryBlock(state(), { direction: "put", confidence: 0.59 }, midday)).toMatch(/confidence/);
+  it("blocks low confidence outside the forced window", () => {
+    expect(entryBlock(state(), { direction: "put", confidence: 0.5 }, midday)).toMatch(/confidence/);
+  });
+  it("waives the confidence gate in the forced daily-minimum window", () => {
+    const late = clock(13 * 60 + 45);
+    expect(isForcedWindow(state(), late)).toBe(true);
+    expect(entryBlock(state(), { direction: "put", confidence: 0.3 }, late)).toBeNull();
+  });
+  it("does not force when the day already traded, a position is open, or halted", () => {
+    const late = clock(13 * 60 + 45);
+    expect(isForcedWindow(state({ dayTrades: 1 }), late)).toBe(false);
+    expect(entryBlock(state({ dayTrades: 1 }), { direction: "put", confidence: 0.3 }, late)).toMatch(/confidence/);
+    expect(isForcedWindow(state({ open: trade() }), late)).toBe(false);
+    expect(isForcedWindow(state({ halted: "daily loss" }), late)).toBe(false);
+    expect(isForcedWindow(state(), midday)).toBe(false);
   });
   it("blocks weekends", () => {
     expect(entryBlock(state(), goodSig, clock(11 * 60, 6))).toMatch(/weekend/);

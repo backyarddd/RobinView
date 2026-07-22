@@ -4,6 +4,18 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.7.1]
+
+### Changed
+
+- **Aggressive paper mode with a daily minimum.** The confidence floor drops to 0.55, the
+  research prompt tells the model to act on modest edges rather than waiting for perfect setups,
+  and a daily-trade mandate guarantees at least one trade per day: if nothing has traded by the
+  final research window (13:00 ET onward), the confidence gate is waived and the model must pick
+  call or put - whichever has the better expected value - reporting its honest confidence. Forced
+  entries are tagged "[forced daily trade]" in the signal log so calibration can be measured
+  separately later. All other risk rules (stop, target, one position, daily loss halt) unchanged.
+
 ## [0.7.0]
 
 ### Added

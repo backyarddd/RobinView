@@ -63,7 +63,14 @@ async function gatherContext() {
     .map((n) => `- ${n.title}${n.summary ? ` :: ${String(n.summary).slice(0, 200)}` : ""}`)
     .join("\n");
   const nowET = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
-  return { bySym, dailyLines, headlines, nowET, record: trackRecord(paper) };
+  // Daily-minimum mandate: final research window (>= 13:00 ET) with no trade
+  // on the books today -> a direction is required, "none" not allowed.
+  const et = new Date().toLocaleString("en-US", { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit" });
+  const [h, m] = et.split(":").map(Number);
+  const todayET = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const tradedToday = paper && paper.day === todayET && (paper.dayTrades > 0 || paper.open);
+  const mustTrade = (h % 24) * 60 + m >= 13 * 60 && !tradedToday && !(paper?.halted);
+  return { bySym, dailyLines, headlines, nowET, record: trackRecord(paper), mustTrade };
 }
 
 function buildPrompt(ctx) {
@@ -84,9 +91,10 @@ You may use WebSearch to check for macro events, Fed speakers, or major breaking
 ${ctx.record}
 
 Rules for your answer:
-- "call" = you expect SPY meaningfully higher by ~15:45 ET; "put" = meaningfully lower; "none" = no conviction either way. "none" is a respectable answer - most days have no exploitable intraday edge, and scheduled macro news is already priced in within seconds.
-- confidence is 0..1 and must be honest: 0.6+ means you would genuinely bet on this. Do not inflate it.
-- thesis: 2-3 sentences, the concrete reason.
+- "call" = you expect SPY higher by ~15:45 ET; "put" = lower; "none" = no conviction either way.
+- This is an AGGRESSIVE experiment designed to generate trades and test reasoning: when you see even a modest edge, take it (0.55+ confidence) rather than waiting for a perfect setup. But confidence must stay honest - it is how we will grade your calibration later. Do not inflate it to force a trade through.
+- thesis: 2-3 sentences, the concrete reason.${ctx.mustTrade ? `
+- MANDATE: no trade has happened today and this is the final window. "none" is NOT allowed - you MUST answer "call" or "put", whichever direction has the better expected value right now, even if the edge is thin. Report your honest (possibly low) confidence; the engine accepts it today.` : ""}
 
 Reply with ONLY a JSON object, no markdown fences, no other text:
 {"direction": "call" | "put" | "none", "confidence": 0.0, "thesis": "..."}`;

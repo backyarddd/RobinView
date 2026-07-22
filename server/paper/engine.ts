@@ -16,7 +16,11 @@ export const RULES = {
   SYMBOL: "SPY",
   SEED: 5_000, // paper account size, $
   TRADE_BUDGET: 500, // max premium spent per trade, $
-  MIN_CONFIDENCE: 0.6,
+  MIN_CONFIDENCE: 0.55,
+  // Aggressive mode: guarantee at least one trade per day. From this ET minute
+  // on, if the day has no trades yet, the confidence gate is waived and the
+  // research prompt mandates a direction ("none" not allowed).
+  FORCE_TRADE_AFTER_MIN: 13 * 60,
   ENTRY_OPEN_MIN: 9 * 60 + 45, // no entries before 9:45 ET (opening churn)
   ENTRY_CLOSE_MIN: 14 * 60, // no entries after 14:00 ET (theta cliff)
   FORCE_CLOSE_MIN: 15 * 60 + 45, // flatten by 15:45 ET, never hold to expiry
@@ -103,10 +107,17 @@ function rollDay(s: PaperState, clock: EtClock) {
   }
 }
 
+// True when the daily-minimum mandate is active: last research window of the
+// day with no trades on the books yet.
+export function isForcedWindow(s: PaperState, clock: EtClock): boolean {
+  return clock.minutes >= RULES.FORCE_TRADE_AFTER_MIN && s.dayTrades === 0 && !s.open && !s.halted;
+}
+
 // Pure entry gate: the reason a signal cannot open a trade, or null if it can.
 export function entryBlock(s: PaperState, sig: { direction: string; confidence: number }, clock: EtClock): string | null {
   if (sig.direction !== "call" && sig.direction !== "put") return "no directional signal";
-  if (sig.confidence < RULES.MIN_CONFIDENCE) return `confidence ${sig.confidence.toFixed(2)} < ${RULES.MIN_CONFIDENCE}`;
+  if (!isForcedWindow(s, clock) && sig.confidence < RULES.MIN_CONFIDENCE)
+    return `confidence ${sig.confidence.toFixed(2)} < ${RULES.MIN_CONFIDENCE}`;
   if (clock.weekday > 5) return "market closed (weekend)";
   if (clock.minutes < RULES.ENTRY_OPEN_MIN || clock.minutes >= RULES.ENTRY_CLOSE_MIN) return "outside entry window (9:45-14:00 ET)";
   if (s.open) return "position already open";
@@ -171,10 +182,11 @@ export async function onSignal(direction: "call" | "put" | "none", confidence: n
           thesis,
           confidence,
         };
+        const forced = isForcedWindow(s, clock) && confidence < RULES.MIN_CONFIDENCE;
         s.cash -= qty * 100 * q.ask;
         s.open = t;
         s.dayTrades += 1;
-        action = `entered ${qty}x ${t.contract} @ ${q.ask.toFixed(2)} (spot ${q.spot.toFixed(2)})`;
+        action = `entered ${qty}x ${t.contract} @ ${q.ask.toFixed(2)} (spot ${q.spot.toFixed(2)})${forced ? " [forced daily trade]" : ""}`;
       }
     }
   }
