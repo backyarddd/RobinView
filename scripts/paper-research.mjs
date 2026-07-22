@@ -127,7 +127,14 @@ async function main() {
     process.exit(1);
   }
   const ctx = await gatherContext();
-  const sig = askClaude(buildPrompt(ctx));
+  let sig;
+  try {
+    sig = askClaude(buildPrompt(ctx));
+  } catch (e) {
+    console.error(`${stamp} first attempt failed (${e.message.slice(0, 120)}), retrying once`);
+    await new Promise((r) => setTimeout(r, 15_000));
+    sig = askClaude(buildPrompt(ctx));
+  }
   const res = await fetch(`${API}/api/paper/signal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
