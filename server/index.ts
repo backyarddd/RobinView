@@ -13,7 +13,7 @@ import { checkForUpdate, applyUpdate } from "./provider/updates.js";
 import { fetchSymbolDetail } from "./provider/detail.js";
 import { fetchOptions } from "./provider/options.js";
 import { resolveDomain } from "./provider/logo.js";
-import { getState as getPaperState, onSignal as onPaperSignal, tick as paperTick, addReview as addPaperReview, startPaperLoop } from "./paper/engine.js";
+import { getState as getPaperState, onSignal as onPaperSignal, tick as paperTick, addReview as addPaperReview, addForecast as addPaperForecast, startPaperLoop } from "./paper/engine.js";
 import type { WsClientMessage, WsMessage } from "../shared/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -129,6 +129,17 @@ app.post("/api/paper/signal", (req, res) =>
   }),
 );
 app.post("/api/paper/tick", (_req, res) => ok(res, () => paperTick().then(() => getPaperState())));
+app.post("/api/paper/forecast", (req, res) =>
+  ok(res, async () => {
+    const { direction, confidence, thesis, baseline, openSpot } = req.body ?? {};
+    if (direction !== "up" && direction !== "down") throw new Error("direction must be up|down");
+    const conf = Number(confidence);
+    if (!Number.isFinite(conf) || conf < 0 || conf > 1) throw new Error("confidence must be 0..1");
+    if (!Number.isFinite(Number(baseline)) || !Number.isFinite(Number(openSpot))) throw new Error("baseline and openSpot required");
+    const f = addPaperForecast(direction, conf, String(thesis ?? "").slice(0, 2000), Number(baseline), Number(openSpot));
+    return f ?? { skipped: "already forecast today" };
+  }),
+);
 app.post("/api/paper/review", (req, res) =>
   ok(res, async () => {
     const { id, verdict, whatHappened, lesson } = req.body ?? {};

@@ -357,6 +357,7 @@ export interface PaperState {
   open: PaperTrade | null;
   trades: PaperTrade[]; // closed, newest first
   signals: PaperSignal[]; // newest first
+  forecasts?: PaperForecast[]; // daily open-of-market up/down calls, newest first
   equityHist: { t: number; v: number }[];
   day: string; // ET date the daily counters refer to
   dayTrades: number;
@@ -372,4 +373,19 @@ export interface PaperReview {
   whatHappened: string; // prediction vs actual path, 2-3 sentences
   lesson: string; // one actionable takeaway for future entries
   at: number; // epoch ms
+}
+
+// Daily market-open forecast: a committed up/down call on SPY's day, graded
+// against the actual close so forecasting accuracy is measurable over time.
+export interface PaperForecast {
+  date: string; // ET trading day YYYY-MM-DD
+  direction: "up" | "down";
+  confidence: number; // 0..1
+  thesis: string;
+  at: number; // epoch ms when logged
+  baseline: number; // previous close the call is measured against
+  openSpot: number; // SPY when the forecast was made
+  close?: number; // filled at resolution
+  actual?: "up" | "down";
+  correct?: boolean;
 }

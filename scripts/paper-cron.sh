@@ -19,7 +19,9 @@ M=$((10#$(TZ=America/New_York date +%M)))
 D=$((10#$(TZ=America/New_York date +%u)))   # 1=Mon .. 7=Sun
 NOW=$((H * 60 + M))
 
-if [ "$D" -le 5 ] && [ "$NOW" -ge 580 ] && [ "$NOW" -le 845 ]; then   # 9:40-14:05 ET
+if [ "$D" -le 5 ] && [ "$NOW" -ge 570 ] && [ "$NOW" -lt 580 ]; then   # 9:30-9:40 ET: daily forecast
+  node scripts/paper-forecast.mjs >>/tmp/robinview-paper-cron.log 2>&1
+elif [ "$D" -le 5 ] && [ "$NOW" -ge 580 ] && [ "$NOW" -le 845 ]; then   # 9:40-14:05 ET: 0DTE research
   node scripts/paper-research.mjs >>/tmp/robinview-paper-cron.log 2>&1
 else
   echo "$(date) skipped - outside ET entry window" >>/tmp/robinview-paper-cron.log

@@ -4,6 +4,18 @@ All notable changes to RobinView are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 [Semantic Versioning](https://semver.org/).
 
+## [0.8.0]
+
+### Added
+
+- **Daily open-of-market forecast.** Every trading day at 9:32 ET the loop researches the tape
+  (quotes, ES futures, recent sessions, headlines, plus web search for scheduled events and
+  overnight news) and commits to an up-or-down call on SPY's day - no neutral allowed - with
+  honest confidence and a written thesis. After the close the engine grades the call against the
+  actual close vs previous close, and the 0DTE Paper view shows the running accuracy record
+  (right/wrong per day, hit rate, expandable theses). The forecast prompt sees its own track
+  record, so calibration can improve with feedback. Missed closes resolve the next morning.
+
 ## [0.7.1]
 
 ### Changed

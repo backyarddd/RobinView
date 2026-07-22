@@ -1,8 +1,9 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { PaperSignal, PaperState, PaperTrade } from "../../shared/types.js";
+import type { PaperForecast, PaperSignal, PaperState, PaperTrade } from "../../shared/types.js";
 import { quote0dte } from "./chain.js";
+import { fetchQuotes } from "../provider/quotes.js";
 
 // Paper 0DTE experiment engine. Simulates buying same-day SPY calls/puts on
 // Claude's research signals, with honest fills: enter at the ask, exit at the
@@ -214,6 +215,11 @@ export async function tick(): Promise<void> {
       close(s, t, 0, undefined, "expired");
     }
   }
+  try {
+    await resolveForecasts(s, clock);
+  } catch {
+    /* transient quote failure; retried next tick */
+  }
   const equity = s.cash + (s.open ? s.open.qty * 100 * (s.open.mark ?? s.open.entryPrice) : 0);
   const last = s.equityHist[s.equityHist.length - 1];
   // Record a point when equity moved or 15 minutes elapsed; cap history.
@@ -222,6 +228,62 @@ export async function tick(): Promise<void> {
     s.equityHist = s.equityHist.slice(-2000);
   }
   persist();
+}
+
+// Log the daily open-of-market forecast (one per ET trading day; repeat posts
+// for the same day are ignored so a retried tick can't double-log).
+export function addForecast(direction: "up" | "down", confidence: number, thesis: string, baseline: number, openSpot: number): PaperForecast | null {
+  const s = getState();
+  s.forecasts ??= [];
+  const clock = etClock();
+  if (s.forecasts.some((f) => f.date === clock.day)) return null;
+  const f: PaperForecast = {
+    date: clock.day,
+    direction,
+    confidence: Math.max(0, Math.min(1, confidence)),
+    thesis: thesis.slice(0, 2000),
+    at: Date.now(),
+    baseline,
+    openSpot,
+  };
+  s.forecasts.unshift(f);
+  s.forecasts = s.forecasts.slice(0, 400);
+  persist();
+  return f;
+}
+
+// Grade the outcome of a forecast: close vs the previous-close baseline.
+export function resolveForecast(f: PaperForecast, close: number): void {
+  f.close = close;
+  f.actual = close >= f.baseline ? "up" : "down";
+  f.correct = f.actual === f.direction;
+}
+
+// Resolve any pending forecasts once their day's close is knowable: after
+// 16:05 ET same day (quote price = the close), or any later day (the quote's
+// previousClose is the most recent close - correct for next-morning catch-up).
+async function resolveForecasts(s: PaperState, clock: EtClock): Promise<boolean> {
+  const pending = (s.forecasts ?? []).filter(
+    (f) => f.correct == null && (f.date < clock.day || (f.date === clock.day && clock.minutes >= 16 * 60 + 5)),
+  );
+  if (!pending.length) return false;
+  const [q] = await fetchQuotes([RULES.SYMBOL]);
+  if (!q) return false;
+  for (const f of pending) {
+    // Same-day after close: live price IS the close. Later days: only resolve
+    // yesterday's forecast via previousClose; older misses stay unresolved
+    // rather than being graded against the wrong day's close.
+    if (f.date === clock.day) resolveForecast(f, q.price);
+    else if (isPrevTradingDay(f.date, clock)) resolveForecast(f, q.previousClose);
+  }
+  return true;
+}
+
+// Whether `day` is the trading day immediately before the clock's day
+// (Fri -> Mon aware, holiday-approximate: allows up to 3 calendar days back).
+function isPrevTradingDay(day: string, clock: EtClock): boolean {
+  const d = (Date.parse(clock.day) - Date.parse(day)) / 86_400_000;
+  return d >= 1 && d <= 3 && clock.minutes < 16 * 60;
 }
 
 // Attach a post-trade review to a closed trade (idempotent; latest wins).
@@ -243,8 +305,10 @@ export function addReview(id: string, review: { verdict: string; whatHappened: s
 export function startPaperLoop(): void {
   setInterval(() => {
     const clock = etClock();
-    const marketish = clock.weekday <= 5 && clock.minutes >= 9 * 60 + 30 && clock.minutes <= 16 * 60 + 5;
-    if (!marketish && !getState().open) return;
+    const s = getState();
+    const marketish = clock.weekday <= 5 && clock.minutes >= 9 * 60 + 30 && clock.minutes <= 16 * 60 + 15;
+    const pendingForecast = (s.forecasts ?? []).some((f) => f.correct == null);
+    if (!marketish && !s.open && !pendingForecast) return;
     tick().catch(() => {});
   }, 60_000);
 }

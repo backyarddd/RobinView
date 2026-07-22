@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { PaperState, PaperTrade } from "@shared/types";
+import type { PaperForecast, PaperState, PaperTrade } from "@shared/types";
 import { Sparkline } from "../common/bits";
 import { ReviewChip } from "../panels/TradeLog";
 import { dirClass } from "../../lib/format";
@@ -42,6 +42,47 @@ function TradeRow({ t }: { t: PaperTrade }) {
       <td className={`mono ${dirClass(pnl)}`}>{fmt$(pnl)}</td>
       <td><ReviewChip t={t} /></td>
     </tr>
+  );
+}
+
+function ForecastPanel({ forecasts }: { forecasts: PaperForecast[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const done = forecasts.filter((f) => f.correct != null);
+  const right = done.filter((f) => f.correct).length;
+  return (
+    <div className="panel" style={{ marginBottom: 16 }}>
+      <div className="panel-head">
+        Daily forecast (up/down call at each open)
+        {done.length > 0 && (
+          <span className="mono dim" style={{ marginLeft: 10, fontSize: 12 }}>
+            {right}/{done.length} correct ({Math.round((right / done.length) * 100)}%)
+          </span>
+        )}
+      </div>
+      <div className="panel-body">
+        {forecasts.length === 0 ? (
+          <div className="dim" style={{ padding: 16 }}>No forecasts yet. One is logged every trading day at 9:32 ET.</div>
+        ) : (
+          forecasts.slice(0, 30).map((f) => (
+            <div key={f.date} style={{ padding: "7px 4px", borderBottom: "1px solid rgba(128,128,128,0.12)", cursor: "pointer" }} onClick={() => setExpanded(expanded === f.date ? null : f.date)}>
+              <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
+                <span className="mono dim" style={{ fontSize: 12, minWidth: 82 }}>{f.date}</span>
+                <span className={f.direction === "up" ? "up" : "down"} style={{ fontWeight: 700, fontSize: 13, minWidth: 52 }}>{f.direction.toUpperCase()}</span>
+                <span className="mono dim" style={{ fontSize: 11 }}>conf {f.confidence.toFixed(2)}</span>
+                {f.correct != null ? (
+                  <span className={`mono ${f.correct ? "up" : "down"}`} style={{ fontSize: 11, fontWeight: 700 }}>
+                    {f.correct ? "✓ RIGHT" : "✗ WRONG"} (closed {f.close?.toFixed(2)} vs {f.baseline.toFixed(2)})
+                  </span>
+                ) : (
+                  <span className="dim mono" style={{ fontSize: 11 }}>pending close…</span>
+                )}
+              </div>
+              {expanded === f.date && <div className="dim" style={{ fontSize: 12, marginTop: 3 }}>{f.thesis}</div>}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -117,6 +158,8 @@ export function PaperView() {
             )}
           </div>
         </div>
+
+        <ForecastPanel forecasts={state.forecasts ?? []} />
 
         {closed.some((t) => t.review) && (
           <div className="panel" style={{ marginBottom: 16 }}>

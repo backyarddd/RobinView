@@ -1,7 +1,7 @@
 {
   "name": "robinview",
   "private": true,
-  "version": "0.7.1",
+  "version": "0.8.0",
   "type": "module",
   "description": "RobinView - a TradingView-class terminal for your Robinhood portfolio. Live charts, indicators, watchlists and real-time PnL.",
   "license": "MIT",

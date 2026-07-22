@@ -103,3 +103,25 @@ describe("paper engine exit rules", () => {
     expect(exitReason(t, 2.0, clock(10 * 60, 3, "2026-07-22"))).toBe("expired");
   });
 });
+
+describe("forecast grading", () => {
+  const base = { date: "2026-07-22", direction: "up" as const, confidence: 0.6, thesis: "", at: 0, baseline: 630, openSpot: 631 };
+  it("grades up call right when close >= baseline", async () => {
+    const { resolveForecast } = await import("../server/paper/engine");
+    const f = { ...base };
+    resolveForecast(f, 632);
+    expect(f).toMatchObject({ actual: "up", correct: true, close: 632 });
+  });
+  it("grades up call wrong when close < baseline", async () => {
+    const { resolveForecast } = await import("../server/paper/engine");
+    const f = { ...base };
+    resolveForecast(f, 628);
+    expect(f).toMatchObject({ actual: "down", correct: false });
+  });
+  it("grades down call right when close < baseline", async () => {
+    const { resolveForecast } = await import("../server/paper/engine");
+    const f = { ...base, direction: "down" as const };
+    resolveForecast(f, 628);
+    expect(f).toMatchObject({ actual: "down", correct: true });
+  });
+});
