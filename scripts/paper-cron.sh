@@ -5,6 +5,15 @@
 cd "$(dirname "$0")/.." || exit 1
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
 
+# Self-heal: if no RobinView API is answering on :8787, start the production
+# server (API + built app in one process). The health probe prevents duplicate
+# server processes from ever fighting over the port.
+if ! curl -s -m 3 -o /dev/null "http://localhost:8787/api/health"; then
+  nohup npm start >/tmp/robinview-server.log 2>&1 &
+  echo "$(date) started RobinView server (was down)" >>/tmp/robinview-paper-cron.log
+  sleep 8
+fi
+
 H=$((10#$(TZ=America/New_York date +%H)))
 M=$((10#$(TZ=America/New_York date +%M)))
 D=$((10#$(TZ=America/New_York date +%u)))   # 1=Mon .. 7=Sun
